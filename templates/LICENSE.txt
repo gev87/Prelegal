@@ -1,0 +1,54 @@
+LICENSE NOTICE FOR THIS DIRECTORY
+=================================
+
+Every file in this "templates" directory is a legal agreement template
+published by Common Paper (https://commonpaper.com) and retrieved from the
+Common Paper GitHub organisation at https://github.com/CommonPaper.
+
+All of these templates are licensed under the
+Creative Commons Attribution 4.0 International License (CC BY 4.0).
+
+    Full licence text: https://creativecommons.org/licenses/by/4.0/legalcode
+    Human-readable summary: https://creativecommons.org/licenses/by/4.0/
+
+WHAT THIS MEANS
+---------------
+
+You are free to:
+
+  * Share  — copy and redistribute the material in any medium or format.
+  * Adapt  — remix, transform, and build upon the material for any purpose,
+             including commercially.
+
+Under the following terms:
+
+  * Attribution — You must give appropriate credit to Common Paper, provide a
+    link to the licence, and indicate if changes were made. You may do so in
+    any reasonable manner, but not in any way that suggests Common Paper
+    endorses you or your use.
+
+  * No additional restrictions — You may not apply legal terms or
+    technological measures that legally restrict others from doing anything
+    the licence permits.
+
+ATTRIBUTION STRING
+------------------
+
+When distributing these templates, or documents derived from them, use an
+attribution such as:
+
+    Based on the <template name> by Common Paper
+    (https://commonpaper.com), licensed under CC BY 4.0
+    (https://creativecommons.org/licenses/by/4.0/). Modified.
+
+Omit "Modified." if the template is reproduced unchanged.
+
+NOTES
+-----
+
+  * This notice applies to the contents of this directory only. The Prelegal
+    project itself is released under the MIT License; see ../LICENSE.
+  * ../catalog.json lists each template together with the Common Paper
+    repository and file it was retrieved from.
+  * These templates are provided for informational purposes and are not legal
+    advice. Consult a qualified lawyer before relying on any of them.
