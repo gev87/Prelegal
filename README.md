@@ -6,15 +6,31 @@
 
 Prelegal is currently a work in progress. This README is a placeholder that will be expanded as the project takes shape.
 
+## Project structure
+
+| Path            | What it holds                                                        |
+| --------------- | -------------------------------------------------------------------- |
+| `templates/`    | Legal agreement templates from [Common Paper](https://github.com/CommonPaper), under CC BY 4.0 |
+| `catalog.json`  | Name, description and filename of every template                      |
+| `frontend/`     | Next.js app — currently the Mutual NDA creator                        |
+
+## Getting started
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open <http://localhost:3000> to fill in and download a Mutual NDA. See
+[`frontend/README.md`](frontend/README.md) for more.
+
 ## What's coming
 
 The following sections will be filled in before the project is considered complete:
 
 - Project overview — what Prelegal is and the problem it solves
 - Tech stack — languages, frameworks, and key dependencies
-- Getting started — prerequisites, install steps, environment variables/config
-- Usage — how to run the app locally and common commands
-- Project structure — a short map of the main directories
 - Contributing — branch and PR conventions
 
 ## License
