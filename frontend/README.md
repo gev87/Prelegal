@@ -77,7 +77,33 @@ lib/nda/
   schema.ts             Field types, defaults, validation, defined-term table
   render.ts             Merges fields and standard terms into the document
   templates.ts          Server-only reader for ../templates
+test/
+  unit/                 Schema, renderer, template reader
+  components/           Form, preview and creator under jsdom
+  fixtures/             Shared field builders and a miniature template
+docs/
+  manual-test-plan.md   What the automated suite cannot reach
 ```
+
+## Testing
+
+```bash
+npm test              # the whole suite, once
+npm run test:watch    # re-run on change
+npm run test:coverage # with a coverage report
+npm run verify        # typecheck, lint, test, build
+```
+
+Vitest under jsdom. The suite leans on the layer where a mistake is most
+expensive: `lib/nda/` produces the words of a signed agreement, so it is
+covered exhaustively, including a snapshot of the whole rendered document and
+a check that every cross-reference in `templates/mutual-nda.md` still matches a
+term the cover page defines — the drift that would otherwise silently turn a
+defined term into plain text.
+
+Three things the suite deliberately does not cover, because a browser has to
+do them: the print stylesheet's real output, what the OS does with a download,
+and layout below 900px. Those live in `docs/manual-test-plan.md`.
 
 ## Licensing
 
