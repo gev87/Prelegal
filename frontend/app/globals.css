@@ -113,9 +113,13 @@ body {
   overscroll-behavior: contain;
 }
 
-.pane-form {
+.pane-chat {
   background: var(--chrome-800);
-  padding: 1.75rem 1.5rem 4rem;
+  /* The pane itself does not scroll — the transcript inside it does, so the
+     composer stays on screen instead of being chased off the bottom. */
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .pane-document {
@@ -169,183 +173,135 @@ body {
 }
 
 /* ==========================================================================
-   Form
+   Chat
+   ==========================================================================
+
+   The transcript reads as a conversation rather than as a chat app: no
+   bubbles, no avatars, no timestamps. Someone is drafting a legal document,
+   and a speaker label carries everything the shape of a bubble would.
    ========================================================================== */
 
-.form-intro {
-  margin: 0 0 1.75rem;
-  max-width: 34rem;
-  font-size: 0.85rem;
-  line-height: 1.55;
-  color: var(--chrome-muted);
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
-.fieldset {
-  border: 0;
-  margin: 0 0 2.25rem;
-  padding: 0;
+.chat-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.75rem 1.5rem 1rem;
 }
 
-.fieldset-legend {
+.chat-message {
+  margin: 0 0 1.35rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  /* The assistant writes in paragraphs; without this they arrive as one. */
+  white-space: pre-wrap;
+}
+
+/* The label sits above what was said rather than beside it, so a long answer
+   is not indented around a hanging name. */
+.chat-who {
   display: block;
-  width: 100%;
-  padding: 0 0 0.85rem;
-  margin-bottom: 1.15rem;
-  border-bottom: 1px solid var(--rule);
+  margin-bottom: 0.3rem;
   font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.13em;
+}
+
+.chat-message-user {
+  color: var(--chrome-text);
+}
+
+.chat-message-user .chat-who {
+  color: var(--chrome-faint);
+}
+
+.chat-message-assistant {
+  color: var(--chrome-muted);
+}
+
+.chat-message-assistant .chat-who {
   color: var(--brass-on-dark);
 }
 
-.field {
-  margin-bottom: 1.25rem;
+.chat-thinking {
+  opacity: 0.7;
+}
+
+.chat-composer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid var(--rule);
+  background: var(--chrome-800);
+}
+
+.chat-input {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
-}
-
-.field-label {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-size: 0.82rem;
-  font-weight: 500;
+  background: var(--chrome-700);
   color: var(--chrome-text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
 }
 
-.field-hint {
-  display: block;
-  margin: -0.15rem 0 0.45rem;
-  font-size: 0.76rem;
-  line-height: 1.45;
+.chat-input:hover {
+  border-color: var(--chrome-600);
+}
+
+.chat-input::placeholder {
   color: var(--chrome-faint);
 }
 
-.field-error {
-  display: block;
-  margin-top: 0.35rem;
-  font-size: 0.76rem;
+.chat-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.chat-send {
+  align-self: flex-end;
+}
+
+.chat-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chat-error,
+.chat-notice {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.chat-error {
   color: var(--danger);
 }
 
-.input,
-.textarea,
-.select {
-  width: 100%;
-  padding: 0.5rem 0.65rem;
-  border-radius: var(--radius);
+/* Not an error: the server simply has no key. The document beside it still
+   works, so this is said in the same voice as the rest of the panel rather
+   than in red. */
+.chat-notice {
+  padding: 0.7rem 0.8rem;
   border: 1px solid var(--rule);
-  background: var(--chrome-700);
-  color: var(--chrome-text);
-  font-family: inherit;
-  font-size: 0.86rem;
-  line-height: 1.5;
-  transition: border-color 0.15s ease;
-}
-
-.input:hover,
-.textarea:hover,
-.select:hover {
-  border-color: var(--chrome-600);
-}
-
-.input::placeholder,
-.textarea::placeholder {
-  color: var(--chrome-faint);
-}
-
-.textarea {
-  resize: vertical;
-  min-height: 4.5rem;
-}
-
-.select {
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--chrome-muted) 50%),
-    linear-gradient(135deg, var(--chrome-muted) 50%, transparent 50%);
-  background-position: right 0.95rem center, right 0.7rem center;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
-  padding-right: 2rem;
-}
-
-.input-invalid,
-.textarea-invalid,
-.select-invalid {
-  border-color: var(--danger);
-}
-
-.input-narrow {
-  width: 5rem;
-}
-
-/* Radio choices mirroring the checkbox pairs on the printed cover page. */
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.choice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--rule);
+  border-left: 2px solid var(--brass);
   border-radius: var(--radius);
-  background: var(--chrome-700);
-  font-size: 0.82rem;
-  line-height: 1.45;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-label.choice,
-.choice label,
-.choice input[type="radio"] {
-  cursor: pointer;
-}
-
-.choice:hover {
-  border-color: var(--chrome-600);
-}
-
-.choice-selected {
-  border-color: var(--brass);
   background: var(--brass-soft);
-}
-
-.choice input {
-  margin: 0.2rem 0 0;
-  accent-color: var(--brass-on-dark);
-  flex-shrink: 0;
-}
-
-.choice-body {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.party-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 1rem;
-}
-
-/* Flash when a defined term in the document jumps to its control. */
-.field-flash {
-  animation: field-flash 1.4s ease-out;
-}
-
-@keyframes field-flash {
-  0%,
-  55% {
-    box-shadow: 0 0 0 2px var(--brass-on-dark), 0 0 0 6px var(--brass-soft);
-  }
-  100% {
-    box-shadow: 0 0 0 2px transparent, 0 0 0 6px transparent;
-  }
+  color: var(--chrome-muted);
 }
 
 /* ==========================================================================
@@ -645,10 +601,6 @@ label.choice,
   .sheet {
     padding: 2.25rem 1.5rem 2.5rem;
   }
-
-  .party-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* ==========================================================================
@@ -670,8 +622,9 @@ label.choice,
   }
 
   /* Unwrap the scrolling panes so the sheet can flow across pages. Note this
-     must not name `.pane`, which would tie with `.pane-form` below and, being
-     later in the file, would win — printing the form alongside the document. */
+     must not name `.pane`, which would tie with `.pane-chat` below and, being
+     later in the file, would win — printing the conversation alongside the
+     document. */
   .app,
   .panes,
   .pane-document {
@@ -685,7 +638,7 @@ label.choice,
   }
 
   .app-header,
-  .pane-form,
+  .pane-chat,
   .view-switch,
   .no-print {
     display: none;

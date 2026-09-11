@@ -5,7 +5,7 @@ import {
   DEFAULT_PURPOSE,
   DEFINED_TERMS,
   DEFINED_TERM_BY_LABEL,
-  ERROR_FIELD_IDS,
+  ERROR_LABELS,
   MAX_TERM_YEARS,
   MIN_TERM_YEARS,
   US_STATES,
@@ -261,12 +261,12 @@ describe("error-to-field mapping", () => {
     });
 
     for (const name of Object.keys(everyError)) {
-      expect(ERROR_FIELD_IDS).toHaveProperty(name);
+      expect(ERROR_LABELS).toHaveProperty(name);
     }
   });
 
-  it("lists the field groups in the order the form reads top to bottom", () => {
-    expect(Object.keys(ERROR_FIELD_IDS)).toEqual([
+  it("lists the answers in the order the document reads top to bottom", () => {
+    expect(Object.keys(ERROR_LABELS)).toEqual([
       "purpose",
       "effectiveDate",
       "mndaTermYears",
@@ -304,8 +304,8 @@ describe("defined terms", () => {
 
   it("distinguishes governing law from jurisdiction, which share an anchor", () => {
     expect(DEFINED_TERMS.governingLaw.anchor).toBe(DEFINED_TERMS.jurisdiction.anchor);
-    expect(DEFINED_TERM_BY_LABEL["Governing Law"].fieldId).toBe("field-governing-law");
-    expect(DEFINED_TERM_BY_LABEL.Jurisdiction.fieldId).toBe("field-jurisdiction");
+    expect(DEFINED_TERM_BY_LABEL["Governing Law"].key).toBe("governingLaw");
+    expect(DEFINED_TERM_BY_LABEL.Jurisdiction.key).toBe("jurisdiction");
   });
 
   it("points every anchor at a fragment", () => {

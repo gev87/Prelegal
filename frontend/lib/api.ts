@@ -18,6 +18,24 @@
  */
 const DEV_API_PORT = "8000";
 
+/**
+ * What went wrong, in words worth showing someone.
+ *
+ * FastAPI answers a rejected body with `detail` as a list of problems and
+ * everything else with `detail` as a sentence. Both shapes arrive here, from
+ * every endpoint, which is why this lives beside `apiUrl` rather than in the
+ * screen that happened to need it first.
+ */
+export async function describeFailure(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null);
+  const detail = body?.detail;
+
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail) && typeof detail[0]?.msg === "string") return detail[0].msg;
+
+  return "Something went wrong. Please try again.";
+}
+
 export function apiUrl(path: string): string {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return `${process.env.NEXT_PUBLIC_API_BASE_URL}${path}`;
