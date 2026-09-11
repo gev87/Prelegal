@@ -1,0 +1,17 @@
+# Normalise line endings so a checkout on one platform does not produce files
+# another platform refuses to run.
+* text=auto
+
+# Shell scripts must keep LF wherever they are checked out. With CRLF, the
+# shebang line ends in a carriage return and the script dies with
+# "/usr/bin/env: 'bash\r': No such file or directory" — which reads as a
+# missing interpreter rather than a line-ending problem.
+*.sh text eol=lf
+
+# PowerShell is happy with either; CRLF is what Windows tooling expects.
+*.ps1 text eol=crlf
+
+# Written by the frontend build and the test suite; never diffed by hand.
+*.snap -text
+uv.lock -diff
+package-lock.json -diff

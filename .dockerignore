@@ -1,0 +1,19 @@
+.git
+.github
+.claude
+
+# Rebuilt inside the image; copying a host build would defeat the layer cache
+# and could ship a stale export.
+**/node_modules
+**/.next
+**/out
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/coverage
+**/*.tsbuildinfo
+
+# The database is created at startup, never carried in.
+**/*.db
+**/.data

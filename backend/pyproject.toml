@@ -1,0 +1,25 @@
+[project]
+name = "prelegal-backend"
+version = "0.1.0"
+description = "Prelegal backend: the auth API today, the V1 API surface as it grows."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.141.1,<0.142",
+    "bcrypt>=4.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",
+]
+
+# An application run as `uvicorn app.main:app`, not a library anyone installs.
+# Skipping the wheel build avoids a [build-system] section that would exist
+# purely as ceremony.
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
