@@ -47,6 +47,33 @@ require_free_port() {
   exit 1
 }
 
+# The assistant's key, from the environment or from an untracked .env file at
+# the repository root. Absent is not an error: the product runs without it,
+# and only the chat panel reports itself unavailable. Warning rather than
+# failing keeps `start` working for anyone who just wants to read the
+# document — see backend/app/llm.py.
+openrouter_key() {
+  if [ -n "${OPENROUTER_API_KEY:-}" ]; then
+    printf %s "${OPENROUTER_API_KEY}"
+    return 0
+  fi
+
+  local env_file="$(repo_root)/.env"
+  [ -f "${env_file}" ] || return 0
+
+  # Only this one name, and only the part after the first "=", so a value
+  # containing "=" survives and nothing else in the file is executed.
+  #
+  # The `|| true` is load-bearing. grep exits 1 when it matches nothing, and
+  # under `set -e` that would take the whole script down over the entirely
+  # ordinary case of a .env holding other settings but not this one.
+  sed -n 's/^OPENROUTER_API_KEY=//p' "${env_file}" 2>/dev/null \
+    | head -n 1 \
+    | tr -d '\042\015' || true
+
+  return 0
+}
+
 # Clears a container left behind by a crash or a bare `docker stop`, so that
 # starting twice in a row never fails with "name already in use".
 remove_existing_container() {
@@ -80,7 +107,16 @@ start_prelegal() {
   docker build -t "${IMAGE}" .
 
   remove_existing_container
-  docker run -d --name "${CONTAINER}" -p "${PORT}:8000" "${IMAGE}" >/dev/null
+
+  # Passed at run time, never baked in with ENV: a key in a layer is a key in
+  # every copy of the image.
+  key="$(openrouter_key)"
+  if [ -z "${key}" ]; then
+    echo "No OPENROUTER_API_KEY found, so the AI chat will be unavailable." >&2
+    echo "Set it in your shell or in .env — see .env.example." >&2
+  fi
+
+  docker run -d --name "${CONTAINER}" -p "${PORT}:8000"     -e "OPENROUTER_API_KEY=${key}" "${IMAGE}" >/dev/null
 
   wait_until_ready
 }
