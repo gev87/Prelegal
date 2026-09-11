@@ -733,3 +733,165 @@ label.choice,
     transition-duration: 0.01ms;
   }
 }
+
+/* ==========================================================================
+   Login
+
+   The one screen on the Prelegal brand palette rather than the drafting
+   chrome: navy headings, a purple submit, blue for the ways out. The creator
+   keeps its own dark palette — these tokens and the .login-* rules below are
+   additive, and nothing above this comment reads them.
+   ========================================================================== */
+
+:root {
+  --brand-navy: #032147;
+  --brand-blue: #209dd7;
+  --brand-purple: #753991;
+  --brand-yellow: #ecad0a;
+  --brand-gray: #888888;
+
+  --brand-paper: #f4f6f9;
+  --brand-rule: #d9dfe7;
+}
+
+.login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 2rem 1.25rem;
+  background: var(--brand-paper);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 25rem;
+  padding: 2.25rem;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 14px 40px rgba(3, 33, 71, 0.1);
+  border-top: 3px solid var(--brand-yellow);
+}
+
+.login-brand {
+  margin: 0;
+  color: var(--brand-blue);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.login-heading {
+  margin: 0.4rem 0 1.6rem;
+  color: var(--brand-navy);
+  font-size: 1.4rem;
+  line-height: 1.25;
+}
+
+.login-field {
+  margin-bottom: 1.05rem;
+}
+
+.login-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--brand-navy);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--brand-rule);
+  border-radius: var(--radius);
+  background: #ffffff;
+  color: var(--brand-navy);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.login-input:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 1px;
+  border-color: var(--brand-blue);
+}
+
+.login-hint {
+  margin: 0.3rem 0 0;
+  color: var(--brand-gray);
+  font-size: 0.75rem;
+}
+
+.login-error {
+  margin: 0 0 1.1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border-left: 3px solid #c2413c;
+  background: rgba(194, 65, 60, 0.08);
+  color: #8f2f2b;
+  font-size: 0.84rem;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.65rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--brand-purple);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-submit:hover:not(:disabled) {
+  background: #632f7c;
+}
+
+.login-submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.login-alternate,
+.login-skip a {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand-blue);
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.login-skip {
+  margin: 0.9rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--brand-rule);
+}
+
+.login-skip a {
+  margin-top: 0;
+  color: var(--brand-gray);
+  text-decoration: underline;
+}
+
+.login-skip a:hover {
+  color: var(--brand-navy);
+}
+
+/* The creator is withheld until the visitor's date is known — one frame,
+   on a ground that matches the chrome so it does not flash white. */
+.app-loading {
+  height: 100%;
+  background: var(--chrome-900);
+}

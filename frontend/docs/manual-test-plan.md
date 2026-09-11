@@ -119,9 +119,63 @@ they cannot check is what the operating system actually does with it.
 
 | # | Step | Expected | Result |
 |---|---|---|---|
-| 8.1 | Load the page the day after first loading it | Effective date is the new day, not the build day | ⚠️ Not run — needs a date change |
-| 8.2 | Rename `templates/` and reload | Clear error naming the missing file and the expected location | ⚠️ Not run — `[auto]` covers the message |
-| 8.3 | Edit `templates/mutual-nda.md`, reload | The change appears without touching the frontend | ⚠️ Not run |
+| 8.1 | Load the page the day after first loading it `[auto]` | Effective date is the new day, not the build day | ⚠️ Not run — needs a date change |
+| 8.2 | Rename `templates/` and run `npm run build` | Clear error naming the missing file and the expected location | ⚠️ Not run — `[auto]` covers the message |
+| 8.3 | Edit `templates/mutual-nda.md`, rebuild, reload | The change appears without touching the frontend | ⚠️ Not run |
+
+> **8.2 and 8.3 are build-time checks now.** The Standard Terms are read while
+> the export is produced, not while it is served, so a template edit shows up
+> after `npm run build` — not after a reload, and not after restarting the
+> container. 8.1 moved the other way: the date is the browser's now, so it
+> changes overnight without any rebuild at all.
+
+---
+
+## 9. Login screen `[PL-4]`
+
+Run against `npm run dev` with the backend up
+(`cd backend && uv run uvicorn app.main:app --reload`).
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 9.1 | Open `/login` | Brand palette: navy heading, purple button, yellow rule on top of the card | ⏭️ Not run |
+| 9.2 | Submit a new email and password `[auto]` | Enters the creator at `/` | ⏭️ Not run |
+| 9.3 | Sign up with the same email again `[auto]` | "An account with that email already exists." | ⏭️ Not run |
+| 9.4 | Sign in with the right password `[auto]` | Enters the creator | ⏭️ Not run |
+| 9.5 | Sign in with the wrong password `[auto]` | "That email and password do not match an account." | ⏭️ Not run |
+| 9.6 | Sign in with an email that was never registered | The *same* message as 9.5, word for word | ⏭️ Not run |
+| 9.7 | Click "Continue without an account" `[auto]` | Enters the creator; no request in the Network tab | ⏭️ Not run |
+| 9.8 | Stop the backend, then submit `[auto]` | "Could not reach the server." — not a blank screen | ⏭️ Not run |
+| 9.9 | Enter a password of 7 characters | The browser blocks it before any request is sent | ⏭️ Not run |
+| 9.10 | Open `/login` on a phone over the LAN | Card is readable and centred; sign-in reaches the API | ⏭️ Not run |
+
+> 9.6 is the user-enumeration check. If those two messages ever differ, the
+> login screen has started telling strangers which email addresses have
+> accounts.
+
+## 10. The container `[PL-4]`
+
+Run against `scripts/start-<os>`. **None of this is reachable from the
+automated suites** — they test the two halves separately and never the image.
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 10.1 | `scripts/start-<os>` with Docker stopped | One line telling you to start Docker; no stack trace; exit 1 | ✅ Pass — mac + windows |
+| 10.2 | `scripts/stop-<os>` with Docker stopped | "Docker is not running; nothing to stop."; exit 0 | ✅ Pass — mac + windows |
+| 10.3 | `scripts/start-<os>` | Builds, then reports `http://localhost:8000` only once it answers | ⏭️ Not run — Docker unavailable |
+| 10.4 | Open `http://localhost:8000` | The creator, fully styled, effective date = today | ⏭️ Not run |
+| 10.5 | Open `http://localhost:8000/login` | The login screen — **not** a 404 | ⏭️ Not run |
+| 10.6 | Sign up, then `stop` and `start` again, and sign up with the same email | Succeeds — the database really was recreated | ⏭️ Not run |
+| 10.7 | Run `start` twice without stopping | Second run succeeds; no "name already in use" | ⏭️ Not run |
+| 10.8 | Occupy port 8000, then `start` | Refuses with a clear message rather than a Docker error | ⏭️ Not run |
+| 10.9 | `scripts/stop-<os>`, then `docker ps -a` | No `prelegal` container left behind | ⏭️ Not run |
+| 10.10 | Leave the container running a day, then reload | Effective date is *that* day, not the build date | ⏭️ Not run |
+
+> **10.3–10.10 were not run.** The Docker daemon was not available on the
+> machine this was built on, so the image has never been built. 10.5 and 10.10
+> are the two worth doing first: 10.5 is the `trailingSlash` behaviour, which
+> a wrong setting turns into a 404, and 10.10 is the reason the effective date
+> moved to the browser at all.
 
 ---
 
@@ -133,3 +187,6 @@ they cannot check is what the operating system actually does with it.
   `requestAnimationFrame` limitation and the window resize not applying. Every
   one of those has a passing automated equivalent, but the print output
   (5.4/5.5) and the keyboard pass (7.1/7.3) genuinely need a human.
+- **Sections 9 and 10 (PL-4) have not been run**, beyond the two script
+  failure paths noted in 10.1 and 10.2. The container has never been built on
+  this machine.
