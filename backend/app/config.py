@@ -44,6 +44,16 @@ CORS_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 CORS_ORIGIN_REGEX = r"http://192\.168\.88\.\d{1,3}:3000"
 
 
+#: Lets the assistant answer. Absent is a supported state, not a
+#: misconfiguration: ``app.llm.ensure_configured`` turns it into a clean 503 on
+#: the chat route alone, and the rest of the product — the preview, both
+#: downloads, the whole auth API — neither reads it nor needs it.
+#:
+#: Never baked into the image. The start scripts pass it to `docker run`, so a
+#: key lives in the environment or in an untracked .env file, not in a layer.
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+
+
 def cors_origins() -> list[str]:
     """Allowed origins, overridable as a comma-separated environment value."""
     configured = os.environ.get("PRELEGAL_CORS_ORIGINS")
