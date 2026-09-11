@@ -67,6 +67,11 @@ celerybeat.pid
 *.pid
 *.sock
 
+# The frontend's static export, copied into the backend by the Docker
+# build. Present locally only if someone mirrors that by hand.
+backend/static/
+backend/.data/
+
 # Databases
 *.db
 *.sqlite
