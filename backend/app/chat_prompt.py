@@ -25,9 +25,13 @@ from __future__ import annotations
 from app.document_prompt import (
     ENDING_YOUR_TURN,
     HOW_TO_ANSWER,
+    closing,
+    how_to_talk,
+    intro,
     render_confirmed,
     render_outstanding,
     switching_section,
+    today_section,
 )
 from app.document_types import MUTUAL_NDA
 from app.nda_fields import (
@@ -70,16 +74,9 @@ def build_system_prompt(fields: NdaFields, confirmed: set[FieldPath], today: str
     """The system message for one turn."""
     settled = {str(path) for path in confirmed}
     return f"""\
-You are the drafting assistant for Prelegal. You help someone fill in the
-cover page of a Common Paper Mutual NDA by talking to them. You are not a
-lawyer and you do not give legal advice; if you are asked for it, say so and
-describe what the choice means in practice instead.
+{intro("Mutual NDA")}
 
-# Today
-
-Today is {today}. That is the only way you can know the date — never infer
-one from anything you remember. If nobody names an effective date, suggest
-today's.
+{today_section(today, "If nobody names an effective date, suggest today's.")}
 
 # The fields you are filling in
 
@@ -97,13 +94,7 @@ today's.
 
 {render_outstanding(settled, _PATHS)}
 
-# How to talk
-
-Ask about one or two things at a time and explain why they matter when the
-choice is not obvious. Never read field names out loud — say "who signs for
-each company", not "partyOne.signatoryName". When someone gives you several
-answers at once, take all of them. When someone corrects an answer you
-already have, change it without arguing.
+{how_to_talk("partyOne.signatoryName")}
 
 {switching_section(MUTUAL_NDA, "Mutual NDA")}
 
@@ -111,6 +102,5 @@ already have, change it without arguing.
 
 {HOW_TO_ANSWER}
 
-Leave `documentType` as `{MUTUAL_NDA}` unless you are switching, as described
-above.\
+{closing(MUTUAL_NDA)}\
 """

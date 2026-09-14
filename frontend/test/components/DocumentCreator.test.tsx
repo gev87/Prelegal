@@ -3,16 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import DocumentCreator from "@/components/DocumentCreator";
-import { documentFilename } from "@/lib/documents/render";
 import { renderMnda } from "@/lib/nda/render";
 import { createDefaultFields, type NdaFields } from "@/lib/nda/schema";
-import {
-  asDocumentFields,
-  completeFields,
-  DOCUMENTS,
-  FAKE_STANDARD_TERMS,
-  NDA_DOCUMENT,
-} from "../fixtures/fields";
+import { completeFields, DOCUMENTS, FAKE_STANDARD_TERMS } from "../fixtures/fields";
 
 const TODAY = "2026-03-14";
 
@@ -275,7 +268,7 @@ describe("DocumentCreator", () => {
 
       await user.click(screen.getByRole("button", { name: "Download Markdown" }));
 
-      expect(downloadedNames[0]).toBe(documentFilename(NDA_DOCUMENT, asDocumentFields(expectedFields()), "md"));
+      expect(downloadedNames[0]).toBe("mutual-nda-acme-inc-and-globex-corporation-2026-03-14.md");
     });
 
     it("writes the same document the preview is showing", async () => {

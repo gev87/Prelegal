@@ -17,7 +17,10 @@
  * cover page has and no other document does.
  */
 
-import { renderMnda } from "@/lib/nda/render";
+import {
+  documentFilename as ndaFilename,
+  renderMnda,
+} from "@/lib/nda/render";
 import type { NdaFields } from "@/lib/nda/schema";
 
 import {
@@ -46,7 +49,7 @@ export function renderDocument(doc: DocumentType, fields: DocumentFields): strin
     return renderMnda(fields as unknown as NdaFields, doc.standardTerms);
   }
 
-  return `${renderCoverPage(doc, fields)}\n${transformStandardTerms(doc, fields)}`;
+  return `${renderCoverPage(doc, fields)}\n${transformStandardTerms(doc)}`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -147,10 +150,7 @@ function escapeTableCell(text: string): string {
 /* Standard terms                                                             */
 /* -------------------------------------------------------------------------- */
 
-export function transformStandardTerms(
-  doc: DocumentType,
-  fields: DocumentFields,
-): string {
+export function transformStandardTerms(doc: DocumentType): string {
   const anchors = anchorsByLabel(doc);
   const roles = new Set(doc.parties.map((party) => party.role));
 
@@ -222,6 +222,14 @@ export function documentFilename(
   fields: DocumentFields,
   extension: string,
 ): string {
+  // The Mutual NDA is catalogued with no descriptors and no parties — its
+  // cover page is hand-written — so the generic path below would find no
+  // companies and no date and name every download plain "mutual-nda.md".
+  // Its own renderer knows where those values live.
+  if (isMutualNda(doc.slug)) {
+    return ndaFilename(fields as unknown as NdaFields, extension);
+  }
+
   const companies = doc.parties
     .map((party) => partyAt(fields, party.path).company)
     .map(slugify)

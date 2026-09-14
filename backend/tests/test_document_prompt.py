@@ -165,3 +165,16 @@ def test_a_settled_answer_is_no_longer_outstanding() -> None:
 
     assert "pilotPeriod" not in rendered
     assert "generalCapAmount" in rendered
+
+
+def test_the_selection_prompt_always_ends_with_a_question() -> None:
+    """Found by talking to a real model: it named the right document and then
+    stopped, leaving somebody looking at a document nobody had asked them
+    anything about. The rule that covers the other eleven prompts keys off an
+    outstanding-fields list, which this prompt does not have — before a
+    document is chosen there are no fields — so it needs saying here.
+    """
+    prompt = build_selection_prompt(TODAY)
+
+    assert "# Ending your turn" in prompt
+    assert "End every reply with a question" in prompt

@@ -56,9 +56,10 @@ PARTY_LEAVES: tuple[str, ...] = (
     "noticeAddress",
 )
 
-#: Enumerations a field descriptor can name instead of listing its own
-#: choices. Only one so far; a descriptor with choices peculiar to a single
-#: document type spells them out inline in ``enum_values`` instead.
+#: Every enumeration a field descriptor may name. One so far. Choices live
+#: here rather than inline on a descriptor so that two document types
+#: constraining the same thing constrain it identically — which is precisely
+#: what lets such a field carry across a document switch.
 KNOWN_ENUMS: dict[str, tuple[str, ...]] = {"us_state": US_STATES}
 
 
@@ -93,8 +94,11 @@ class FieldSpec(BaseModel):
     #: One line saying what the answer is *for*, in the voice a drafter would
     #: use. Goes into the system prompt verbatim.
     guide: str
+    #: Names an entry in ``KNOWN_ENUMS``. An enum's choices live there rather
+    #: than inline on the descriptor, so two document types constraining the
+    #: same thing are guaranteed to constrain it identically — which is what
+    #: lets such a field carry across a document switch.
     enum_ref: str | None = None
-    enum_values: list[str] | None = None
     #: Bounds for an ``INT`` field. No descriptor uses one yet — the ten
     #: generic templates never say a value is a number — but the kind exists
     #: so a follow-up can promote a field without reshaping this model.
@@ -103,11 +107,9 @@ class FieldSpec(BaseModel):
 
     def choices(self) -> tuple[str, ...]:
         """The permitted values, for an ``ENUM`` field."""
-        if self.enum_values:
-            return tuple(self.enum_values)
-        if self.enum_ref:
-            return KNOWN_ENUMS[self.enum_ref]
-        raise ValueError(f"{self.path} is an enum with no choices")
+        if not self.enum_ref:
+            raise ValueError(f"{self.path} is an enum with no enum_ref")
+        return KNOWN_ENUMS[self.enum_ref]
 
 
 class PartySpec(BaseModel):

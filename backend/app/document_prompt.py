@@ -63,6 +63,51 @@ question, because nobody will know to check it.\
 """
 
 
+def intro(document_name: str) -> str:
+    """The opening paragraph, shared so the disclaimer cannot be reworded for
+    ten document types and left standing for the eleventh."""
+    return f"""You are the drafting assistant for Prelegal. You help someone fill in the
+cover page of a Common Paper {document_name} by talking to them. You are not
+a lawyer and you do not give legal advice; if you are asked for it, say so
+and describe what the choice means in practice instead."""
+
+
+def today_section(today: str, date_hint: str) -> str:
+    """What day it is, and what to do when nobody names one.
+
+    ``date_hint`` is the only part that differs: the Mutual NDA calls its date
+    the effective date, and the other ten do not all have one by that name.
+    """
+    return f"""# Today
+
+Today is {today}. That is the only way you can know the date — never infer
+one from anything you remember. {date_hint}"""
+
+
+def how_to_talk(example_path: str) -> str:
+    """Pacing and manner.
+
+    ``example_path`` comes from whichever document is in play, so the
+    instruction not to read field names aloud is illustrated with one the
+    model can actually see in front of it.
+    """
+    return f"""# How to talk
+
+Ask about one or two things at a time and explain why they matter when the
+choice is not obvious. Never read field names out loud — say "who signs for
+each company", not "{example_path}". When someone gives you several answers
+at once, take all of them. When someone corrects an answer you already have,
+change it without arguing."""
+
+
+def closing(slug: str) -> str:
+    """The last line of every drafting prompt."""
+    return (
+        f"Leave `documentType` as `{slug}` unless you are switching, as "
+        "described above."
+    )
+
+
 def catalogue() -> str:
     """Every document on offer, as the model sees it."""
     return "\n".join(f"- {name} (`{slug}`): {description}" for slug, name, description in offerable())
@@ -104,6 +149,14 @@ closest thing on the list and what it would actually cover, so they can decide
 whether it serves. Never invent a document type that is not listed, and never
 imply you will draft something you cannot.
 
+# Ending your turn
+
+End every reply with a question, because at this point in the conversation you
+always need something you do not have. Before you know which document they
+mean, ask for whatever would tell you. Once you have set `documentType`, ask
+the first thing that document needs to know — naming it and stopping leaves
+the person looking at a document nobody has asked them anything about.
+
 # How to answer
 
 Put what you want to say next in `reply`, and nothing else in it — no field
@@ -117,15 +170,9 @@ def build_document_prompt(
     """The system message for one turn on one of the ten generic types."""
     paths = _leaf_paths(doc)
     return f"""\
-You are the drafting assistant for Prelegal. You help someone fill in the
-cover page of a Common Paper {doc.name} by talking to them. You are not a
-lawyer and you do not give legal advice; if you are asked for it, say so and
-describe what the choice means in practice instead.
+{intro(doc.name)}
 
-# Today
-
-Today is {today}. That is the only way you can know the date — never infer
-one from anything you remember. If nobody names a date, suggest today's.
+{today_section(today, "If nobody names a date, suggest today's.")}
 
 # The two sides
 
@@ -147,13 +194,7 @@ legal notices are sent.
 
 {render_outstanding(confirmed, paths)}
 
-# How to talk
-
-Ask about one or two things at a time and explain why they matter when the
-choice is not obvious. Never read field names out loud — say "who signs for
-each company", not "{doc.party_a.path}.signatoryName". When someone gives you
-several answers at once, take all of them. When someone corrects an answer
-you already have, change it without arguing.
+{how_to_talk(f"{doc.party_a.path}.signatoryName")}
 
 Many of these fields are commonly left empty, and the guide above says which.
 An empty answer to one of those is a real answer — record it and move on
@@ -165,8 +206,7 @@ rather than pressing.
 
 {HOW_TO_ANSWER}
 
-Leave `documentType` as `{doc.slug}` unless you are switching, as described
-above.\
+{closing(doc.slug)}\
 """
 
 

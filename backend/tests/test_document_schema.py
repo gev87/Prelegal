@@ -229,3 +229,76 @@ def test_a_switch_leaves_the_document_it_came_from_untouched() -> None:
     )
 
     assert current.partyA.company == "Acme Inc."
+
+
+def test_a_switch_matches_the_two_sides_by_role_not_by_position() -> None:
+    """The bug this test exists for would have shipped a signable document
+    with the parties reversed.
+
+    ``partyA`` is the Customer on a Cloud Service Agreement and the Provider
+    on a Data Processing Agreement — the two list their sides in opposite
+    order. Carrying position to position between them put the customer's
+    name, signatory and notice address into the provider's slot, and the
+    switch notice reported that everything carried across.
+    """
+    csa = blank_fields_for("cloud-service-agreement", TODAY)
+    csa.partyA.company = "Acme"  # the Customer
+    csa.partyB.company = "Widget Co"  # the Provider
+
+    moved, carried, _ = switch_document_type(
+        "cloud-service-agreement",
+        csa,
+        {"partyA.company", "partyB.company"},
+        "data-processing-agreement",
+        TODAY,
+    )
+
+    assert moved.partyA.company == "Widget Co"  # the DPA's Provider
+    assert moved.partyB.company == "Acme"  # the DPA's Customer
+    assert set(carried) == {"partyA.company", "partyB.company"}
+
+
+def test_a_switch_keeps_the_sides_where_they_are_when_the_roles_agree() -> None:
+    """The ordinary case, which the role rule must not break: two documents
+    that name their sides the same way round."""
+    csa = blank_fields_for("cloud-service-agreement", TODAY)
+    csa.partyA.company = "Acme"
+
+    moved, _, _ = switch_document_type(
+        "cloud-service-agreement", csa, {"partyA.company"}, "pilot-agreement", TODAY
+    )
+
+    assert moved.partyA.company == "Acme"
+
+
+def test_a_switch_drops_a_side_the_new_document_has_no_role_for() -> None:
+    """A Partnership Agreement has a Company and a Partner, neither of which
+    is a Customer. Guessing by position is how the reversal bug happened, so
+    a side with nowhere to go is dropped and asked again instead."""
+    csa = blank_fields_for("cloud-service-agreement", TODAY)
+    csa.partyA.company = "Acme"
+
+    _, carried, dropped = switch_document_type(
+        "cloud-service-agreement",
+        csa,
+        {"partyA.company"},
+        "partnership-agreement",
+        TODAY,
+    )
+
+    assert carried == []
+    assert dropped == ["partyA.company"]
+
+
+def test_the_mutual_nda_still_crosses_by_position() -> None:
+    """The one document with no roles to match on: its sides are Party 1 and
+    Party 2, and neither is the customer of the other."""
+    nda = blank_fields_for(MUTUAL_NDA, TODAY)
+    nda.partyOne.company = "Acme"
+
+    moved, carried, _ = switch_document_type(
+        MUTUAL_NDA, nda, {"partyOne.company"}, "pilot-agreement", TODAY
+    )
+
+    assert moved.partyA.company == "Acme"
+    assert carried == ["partyA.company"]

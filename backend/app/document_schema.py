@@ -138,10 +138,13 @@ def _choice_enum(enum_ref: str | None, choices: tuple[str, ...]) -> type[StrEnum
     one type's enum into another type's slot, which Pydantic serialises with
     a warning and which makes two identical constraints compare unequal.
     """
+    assert enum_ref is not None, "an enum field must name a KNOWN_ENUMS entry"
     if enum_ref == "us_state":
         return USState
-    name = f"{_pascal(enum_ref)}Choice" if enum_ref else "Choice"
-    return StrEnum(name, {value.upper().replace(" ", "_"): value for value in choices})
+    return StrEnum(
+        f"{_pascal(enum_ref)}Choice",
+        {value.upper().replace(" ", "_"): value for value in choices},
+    )
 
 
 @lru_cache(maxsize=None)
@@ -266,7 +269,14 @@ def blank_fields_for(slug: str, today: str) -> BaseModel:
         elif spec.kind is FieldKind.INT:
             values[spec.path] = spec.min or MIN_TERM_YEARS
         elif spec.kind is FieldKind.ENUM:
-            values[spec.path] = spec.choices()[0] if spec.enum_values else USState.DELAWARE
+                # Delaware for a state, matching the suggestion Common Paper
+            # prints on its own blank cover pages and the NDA's own default.
+            # Any other enum gets its first choice, which is as good a
+            # placeholder as any until somebody answers.
+            choices = spec.choices()
+            values[spec.path] = (
+                USState.DELAWARE if spec.enum_ref == "us_state" else choices[0]
+            )
         else:
             values[spec.path] = ""
     return fields_model_for(slug)(**values)
@@ -357,14 +367,14 @@ def switch_document_type(
     carried: list[str] = []
     dropped: list[str] = []
 
-    crosses_nda = (old_slug == MUTUAL_NDA) != (new_slug == MUTUAL_NDA)
+    parties = _party_map(old_slug, new_slug)
     destination = set(field_paths_for(new_slug))
 
     for path in field_paths_for(old_slug):
         if path not in confirmed:
             continue
-        target = _translate(path, crosses_nda)
-        if target in destination and _same_shape(old_slug, path, new_slug, target):
+        target = _translate(path, parties)
+        if target and target in destination and _same_shape(old_slug, path, new_slug, target):
             write_leaf(new_fields, target, read_leaf(old_fields, path))
             carried.append(target)
         else:
@@ -373,12 +383,57 @@ def switch_document_type(
     return new_fields, carried, dropped
 
 
-def _translate(path: str, crosses_nda: bool) -> str:
-    """The same leaf, spelled the way the destination spells it."""
-    if not crosses_nda:
-        return path
+def _translate(path: str, parties: dict[str, str]) -> str | None:
+    """The same leaf, spelled the way the destination spells it.
+
+    ``None`` when a party has nowhere to go on the new document — see
+    ``_party_map``.
+    """
     head, _, tail = path.partition(".")
-    return f"{_PARTY_ALIASES.get(head, head)}.{tail}" if tail else head
+    if not tail:
+        return path
+    target = parties.get(head)
+    return f"{target}.{tail}" if target else None
+
+
+def _party_map(old_slug: str, new_slug: str) -> dict[str, str]:
+    """Which of the new document's two sides each of the old one's becomes.
+
+    **By role, not by position**, and that distinction is the whole point.
+    ``partyA`` is the Customer on a Cloud Service Agreement and the Provider
+    on a Data Processing Agreement — the two documents happen to list their
+    sides in opposite order. Carrying ``partyA`` to ``partyA`` between them
+    would put the customer's name, signatory and notice address into the
+    provider's slot and produce a signable document with the parties
+    reversed, silently, while the switch notice cheerfully reported that
+    everything carried across.
+
+    The Mutual NDA is the exception, because it genuinely has no roles: its
+    sides are "Party 1" and "Party 2" and neither is the customer of the
+    other. Crossing that boundary is positional, which is the only honest
+    reading of a document that does not distinguish its sides.
+    """
+    # Nothing chosen yet has no sides, and nothing to carry from them.
+    if UNDETERMINED in (old_slug, new_slug):
+        return {}
+
+    if old_slug == MUTUAL_NDA and new_slug == MUTUAL_NDA:
+        return {"partyOne": "partyOne", "partyTwo": "partyTwo"}
+
+    if (old_slug == MUTUAL_NDA) != (new_slug == MUTUAL_NDA):
+        return dict(_PARTY_ALIASES)
+
+    old_doc = load_document_types()[old_slug]
+    new_doc = load_document_types()[new_slug]
+    by_role = {party.role: party.path for party in new_doc.parties}
+
+    # A side whose role the new document does not have is dropped and asked
+    # again, rather than guessed at by position.
+    return {
+        party.path: by_role[party.role]
+        for party in old_doc.parties
+        if party.role in by_role
+    }
 
 
 def _same_shape(old_slug: str, old_path: str, new_slug: str, new_path: str) -> bool:

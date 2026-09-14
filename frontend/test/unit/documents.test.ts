@@ -101,8 +101,7 @@ describe("renderDocument", () => {
 });
 
 describe("transformStandardTerms", () => {
-  const transformed = () =>
-    transformStandardTerms(PILOT_DOCUMENT, completePilotFields());
+  const transformed = () => transformStandardTerms(PILOT_DOCUMENT);
 
   it("links a cover-page reference to the heading that defines it", () => {
     expect(transformed()).toContain("[Pilot Period](#pilot-period)");
@@ -131,6 +130,16 @@ describe("documentFilename", () => {
     expect(documentFilename(PILOT_DOCUMENT, completePilotFields(), "md")).toBe(
       "pilot-agreement-acme-inc-and-globex-corporation-2026-03-14.md",
     );
+  });
+
+  it("names a Mutual NDA download after its parties and date too", () => {
+    // The NDA is catalogued with no descriptors and no parties, so the
+    // generic path finds neither companies nor a date and would name every
+    // download plain "mutual-nda.md". Asserted as a literal string rather
+    // than against the function under test, which is how this went unnoticed.
+    expect(
+      documentFilename(NDA_DOCUMENT, asDocumentFields(completeFields()), "md"),
+    ).toBe("mutual-nda-acme-inc-and-globex-corporation-2026-03-14.md");
   });
 
   it("falls back to the document alone before the parties are known", () => {
