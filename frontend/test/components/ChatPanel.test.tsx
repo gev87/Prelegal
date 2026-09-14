@@ -5,8 +5,14 @@ import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChatPanel, { type ChatPanelHandle } from "@/components/ChatPanel";
-import { createDefaultFields, type NdaFields } from "@/lib/nda/schema";
-import { completeFields } from "../fixtures/fields";
+import type { ChatTurn } from "@/lib/chat";
+import { createDefaultFields } from "@/lib/nda/schema";
+import {
+  asDocumentFields,
+  completeFields,
+  completePilotFields,
+  DOCUMENTS,
+} from "../fixtures/fields";
 
 const TODAY = "2026-03-14";
 
@@ -25,7 +31,10 @@ function jsonResponse(status: number, body: unknown): Response {
   } as Response;
 }
 
-function renderPanel(onFieldsChange: (fields: NdaFields) => void = () => {}) {
+function renderPanel(
+  onTurn: (turn: ChatTurn) => void = () => {},
+  documentType = "mutual-nda",
+) {
   const ref = createRef<ChatPanelHandle>();
 
   return {
@@ -34,9 +43,11 @@ function renderPanel(onFieldsChange: (fields: NdaFields) => void = () => {}) {
     ...render(
       <ChatPanel
         ref={ref}
-        fields={createDefaultFields(TODAY)}
+        documents={DOCUMENTS}
+        documentType={documentType}
+        fields={asDocumentFields(createDefaultFields(TODAY))}
         today={TODAY}
-        onFieldsChange={onFieldsChange}
+        onTurn={onTurn}
       />,
     ),
   };
@@ -51,8 +62,12 @@ async function say(user: ReturnType<typeof userEvent.setup>, text: string) {
 function aTurn(overrides: Record<string, unknown> = {}) {
   return {
     reply: "Got it. Who signs for them?",
+    documentType: "mutual-nda",
+    documentTypeName: "Mutual NDA",
     fields: completeFields({ effectiveDate: TODAY }),
     updatedFields: ["partyOne.company"],
+    carriedFields: [],
+    droppedFields: [],
     ...overrides,
   };
 }
@@ -62,7 +77,7 @@ describe("ChatPanel", () => {
     renderPanel();
 
     expect(screen.getByRole("log", { name: "Conversation" })).toHaveTextContent(
-      "I can help you draft a mutual NDA",
+      "I can help you draft a legal agreement",
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -78,15 +93,23 @@ describe("ChatPanel", () => {
     await waitFor(() => expect(log).toHaveTextContent("Who signs for them?"));
   });
 
-  it("hands the new cover page up", async () => {
+  it("hands the whole turn up", async () => {
+    // The type and the fields move together: a cover page from a new
+    // document shown against the old document's descriptors would be read
+    // with the wrong labels for a render.
     fetchMock.mockResolvedValueOnce(jsonResponse(200, aTurn()));
-    const onFieldsChange = vi.fn();
-    const { user } = renderPanel(onFieldsChange);
+    const onTurn = vi.fn();
+    const { user } = renderPanel(onTurn);
 
     await say(user, "We're Acme.");
 
     await waitFor(() =>
-      expect(onFieldsChange).toHaveBeenCalledWith(completeFields({ effectiveDate: TODAY })),
+      expect(onTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          documentType: "mutual-nda",
+          fields: completeFields({ effectiveDate: TODAY }),
+        }),
+      ),
     );
   });
 
@@ -228,14 +251,14 @@ describe("ChatPanel", () => {
 
     it("refuses a reply it cannot read", async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse(200, { nonsense: true }));
-      const onFieldsChange = vi.fn();
-      const { user } = renderPanel(onFieldsChange);
+      const onTurn = vi.fn();
+      const { user } = renderPanel(onTurn);
 
       await say(user, "Hello.");
 
       expect(await screen.findByRole("alert")).toBeInTheDocument();
       // Nothing malformed reaches the renderer.
-      expect(onFieldsChange).not.toHaveBeenCalled();
+      expect(onTurn).not.toHaveBeenCalled();
     });
   });
 
@@ -351,5 +374,119 @@ describe("ChatPanel", () => {
         { role: "user", content: "It's for a reseller deal." },
       ]);
     });
+  });
+});
+
+/**
+ * PL-6 fix: the conversation has to stay a conversation.
+ *
+ * Clicking "Send" moves focus to the button, and disabling that button while
+ * the request is in flight drops focus to nowhere at all — so before this,
+ * every answer after the first began with a click back into the box. Pressing
+ * Enter happened to work, but only because the textarea is never disabled,
+ * which is incidental rather than intended.
+ */
+describe("where the cursor ends up", () => {
+  function composer() {
+    return screen.getByLabelText("Your message");
+  }
+
+  it("puts the cursor back in the message box after a reply", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, aTurn()));
+    const { user } = renderPanel();
+
+    await say(user, "We're Acme.");
+
+    await waitFor(() =>
+      expect(screen.getByRole("log", { name: "Conversation" })).toHaveTextContent(
+        "Who signs for them?",
+      ),
+    );
+    expect(composer()).toHaveFocus();
+  });
+
+  it("puts it back after a turn that failed", async () => {
+    // The turn you most want to be able to retype immediately is the one
+    // that just went wrong.
+    fetchMock.mockResolvedValueOnce(jsonResponse(502, { detail: "Upstream said no." }));
+    const { user } = renderPanel();
+
+    await say(user, "We're Acme.");
+
+    await screen.findByRole("alert");
+    expect(composer()).toHaveFocus();
+  });
+
+  it("leaves it alone when the assistant has been switched off", async () => {
+    // The box is disabled in that state, so focusing it would be asking the
+    // browser for something it will refuse anyway.
+    fetchMock.mockResolvedValueOnce(jsonResponse(503, { detail: "No key here." }));
+    const { user } = renderPanel();
+
+    await say(user, "We're Acme.");
+
+    await screen.findByRole("alert");
+    expect(composer()).toBeDisabled();
+    expect(composer()).not.toHaveFocus();
+  });
+});
+
+describe("changing document mid-conversation", () => {
+  const switchTurn = {
+    reply: "A pilot agreement suits that better.",
+    documentType: "pilot-agreement",
+    documentTypeName: "Pilot Agreement",
+    fields: completePilotFields(),
+    updatedFields: [],
+    carriedFields: ["partyA.company"],
+    droppedFields: ["purpose"],
+  };
+
+  it("says what carried across and what did not", async () => {
+    // Said by the app, not the model: the server computed the answer, so
+    // asking the model to describe it would spend a turn on something
+    // already known and risk it describing the move wrongly.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, switchTurn));
+    const { user } = renderPanel();
+
+    await say(user, "Actually we need a pilot agreement.");
+
+    const log = screen.getByRole("log", { name: "Conversation" });
+    await waitFor(() => expect(log).toHaveTextContent("Switched to a Pilot Agreement"));
+    expect(log).toHaveTextContent("I kept the Customer's name");
+    expect(log).toHaveTextContent("doesn't ask for the purpose");
+  });
+
+  it("says nothing when the first document is chosen", async () => {
+    // There was no document to carry anything from, and announcing that
+    // nothing survived a document nobody was drafting would be nonsense.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { ...switchTurn, carriedFields: [], droppedFields: [] }),
+    );
+    const { user } = renderPanel(() => {}, "undetermined");
+
+    await say(user, "I need a pilot agreement.");
+
+    const log = screen.getByRole("log", { name: "Conversation" });
+    await waitFor(() => expect(log).toHaveTextContent("suits that better"));
+    expect(log).not.toHaveTextContent("Switched to");
+  });
+
+  it("forgets answers that did not carry, so they are asked again", async () => {
+    // The settled set is replaced rather than extended. Extending it would
+    // leave the assistant believing a dropped answer was still settled and
+    // never asking for it on the new document.
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, switchTurn))
+      .mockResolvedValueOnce(jsonResponse(200, { ...switchTurn, documentType: "pilot-agreement" }));
+    const { user } = renderPanel();
+
+    await say(user, "Actually we need a pilot agreement.");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await say(user, "Sixty days.");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    const sent = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(sent.confirmedFields).toEqual(["partyA.company"]);
   });
 });

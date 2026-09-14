@@ -2,10 +2,17 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import NdaCreator from "@/components/NdaCreator";
-import { documentFilename, renderMnda } from "@/lib/nda/render";
+import DocumentCreator from "@/components/DocumentCreator";
+import { documentFilename } from "@/lib/documents/render";
+import { renderMnda } from "@/lib/nda/render";
 import { createDefaultFields, type NdaFields } from "@/lib/nda/schema";
-import { completeFields, FAKE_STANDARD_TERMS } from "../fixtures/fields";
+import {
+  asDocumentFields,
+  completeFields,
+  DOCUMENTS,
+  FAKE_STANDARD_TERMS,
+  NDA_DOCUMENT,
+} from "../fixtures/fields";
 
 const TODAY = "2026-03-14";
 
@@ -53,7 +60,7 @@ function jsonResponse(status: number, body: unknown): Response {
 function renderCreator() {
   return {
     user: userEvent.setup(),
-    ...render(<NdaCreator standardTerms={FAKE_STANDARD_TERMS} today={TODAY} />),
+    ...render(<DocumentCreator documents={DOCUMENTS} today={TODAY} />),
   };
 }
 
@@ -72,8 +79,15 @@ async function answerEverything(user: ReturnType<typeof userEvent.setup>) {
   fetchMock.mockResolvedValueOnce(
     jsonResponse(200, {
       reply: "That's everything — it's ready to download.",
+      // The same turn chooses the document and fills it in, which is what
+      // the backend does when it settles on a type: PL-6 made choosing a
+      // document the same operation as changing it.
+      documentType: "mutual-nda",
+      documentTypeName: "Mutual NDA",
       fields: expectedFields(),
       updatedFields: ["partyOne.company"],
+      carriedFields: [],
+      droppedFields: [],
     }),
   );
 
@@ -88,7 +102,38 @@ async function answerEverything(user: ReturnType<typeof userEvent.setup>) {
   );
 }
 
-describe("NdaCreator", () => {
+/**
+ * Drives one chat turn that settles on the Mutual NDA and answers nothing.
+ *
+ * Most of what follows used to start with a blank NDA already on screen. It
+ * now starts with no document at all, so these tests say in one exchange what
+ * the old default state said implicitly.
+ */
+async function chooseTheNda(user: ReturnType<typeof userEvent.setup>) {
+  fetchMock.mockResolvedValueOnce(
+    jsonResponse(200, {
+      reply: "A Mutual NDA it is. Who are the two companies?",
+      documentType: "mutual-nda",
+      documentTypeName: "Mutual NDA",
+      fields: createDefaultFields(TODAY),
+      updatedFields: [],
+      carriedFields: [],
+      droppedFields: [],
+    }),
+  );
+
+  await user.click(screen.getByLabelText("Your message"));
+  await user.paste("I need an NDA.");
+  await user.click(screen.getByRole("button", { name: "Send" }));
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("region", { name: "Agreement preview" }),
+    ).toHaveTextContent("Mutual Non-Disclosure Agreement"),
+  );
+}
+
+describe("DocumentCreator", () => {
   it("shows the conversation and the document side by side", () => {
     renderCreator();
 
@@ -100,13 +145,26 @@ describe("NdaCreator", () => {
     renderCreator();
 
     expect(screen.getByRole("log", { name: "Conversation" })).toHaveTextContent(
-      "I can help you draft a mutual NDA",
+      "I can help you draft a legal agreement",
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("seeds the effective date from the date the server rendered", () => {
+  it("has no document until the assistant settles on one", () => {
+    // PL-6 put the choice in the conversation rather than in a picker, so
+    // there is genuinely nothing to draft on the first render.
     renderCreator();
+
+    expect(
+      screen.getByRole("region", { name: "Agreement preview" }),
+    ).toHaveTextContent("No document yet");
+    expect(screen.getByText("Choose a document")).toBeInTheDocument();
+  });
+
+  it("seeds the effective date from the date the browser gave it", async () => {
+    const { user } = renderCreator();
+
+    await answerEverything(user);
 
     expect(
       screen.getByRole("region", { name: "Agreement preview" }),
@@ -116,6 +174,7 @@ describe("NdaCreator", () => {
   describe("the live preview", () => {
     it("follows the answers the assistant settles", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
       const preview = screen.getByRole("region", { name: "Agreement preview" });
 
       expect(preview).not.toHaveTextContent("Globex Corporation");
@@ -145,6 +204,7 @@ describe("NdaCreator", () => {
   describe("when the download is blocked", () => {
     it("has the assistant say what is still outstanding", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
 
       await user.click(screen.getByRole("button", { name: "Download Markdown" }));
 
@@ -156,6 +216,7 @@ describe("NdaCreator", () => {
 
     it("names the outstanding answers in the order the document reads", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
 
       await user.click(screen.getByRole("button", { name: "Download PDF" }));
 
@@ -214,7 +275,7 @@ describe("NdaCreator", () => {
 
       await user.click(screen.getByRole("button", { name: "Download Markdown" }));
 
-      expect(downloadedNames[0]).toBe(documentFilename(expectedFields(), "md"));
+      expect(downloadedNames[0]).toBe(documentFilename(NDA_DOCUMENT, asDocumentFields(expectedFields()), "md"));
     });
 
     it("writes the same document the preview is showing", async () => {
@@ -278,6 +339,7 @@ describe("NdaCreator", () => {
      */
     it("seeds the message box with the term", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
       const preview = screen.getByRole("region", { name: "Agreement preview" });
 
       await user.click(within(preview).getByRole("button", { name: "Purpose" }));
@@ -287,6 +349,7 @@ describe("NdaCreator", () => {
 
     it("tells jurisdiction apart from governing law", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
       const preview = screen.getByRole("region", { name: "Agreement preview" });
 
       await user.click(within(preview).getByRole("button", { name: "Jurisdiction" }));
@@ -298,6 +361,7 @@ describe("NdaCreator", () => {
 
     it("puts the cursor in the message box", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
       const preview = screen.getByRole("region", { name: "Agreement preview" });
 
       await user.click(within(preview).getByRole("button", { name: "Purpose" }));
@@ -307,11 +371,15 @@ describe("NdaCreator", () => {
 
     it("does not send it — reading the document costs nothing", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
       const preview = screen.getByRole("region", { name: "Agreement preview" });
 
+      const before = fetchMock.mock.calls.length;
       await user.click(within(preview).getByRole("button", { name: "Purpose" }));
 
-      expect(fetchMock).not.toHaveBeenCalled();
+      // Not "never called" — choosing the document above took a turn. What
+      // must cost nothing is reading the document afterwards.
+      expect(fetchMock).toHaveBeenCalledTimes(before);
     });
   });
 
@@ -341,6 +409,7 @@ describe("NdaCreator", () => {
 
     it("comes back to the conversation when a term is activated", async () => {
       const { user } = renderCreator();
+      await chooseTheNda(user);
       await user.click(screen.getByRole("button", { name: "Document" }));
 
       const preview = screen.getByRole("region", { name: "Agreement preview" });
@@ -365,8 +434,9 @@ describe("NdaCreator", () => {
     });
   });
 
-  it("keeps the default cover page until the assistant changes it", () => {
-    renderCreator();
+  it("keeps the cover page it was given until the assistant changes it", async () => {
+    const { user } = renderCreator();
+    await chooseTheNda(user);
 
     const defaults = createDefaultFields(TODAY);
 

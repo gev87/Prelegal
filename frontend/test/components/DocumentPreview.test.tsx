@@ -10,7 +10,7 @@ import { completeFields, FAKE_STANDARD_TERMS } from "../fixtures/fields";
 function renderPreview(markdown: string, fields: NdaFields = completeFields()) {
   const onTermSelect = vi.fn();
   const view = render(
-    <DocumentPreview markdown={markdown} fields={fields} onTermSelect={onTermSelect} />,
+    <DocumentPreview markdown={markdown} ndaFields={fields} onTermSelect={onTermSelect} />,
   );
   return { ...view, onTermSelect };
 }
@@ -91,7 +91,7 @@ describe("DocumentPreview", () => {
       rerender(
         <DocumentPreview
           markdown={markdown}
-          fields={completeFields({ confidentialityMode: "perpetual" })}
+          ndaFields={completeFields({ confidentialityMode: "perpetual" })}
           onTermSelect={vi.fn()}
         />,
       );
@@ -184,19 +184,24 @@ describe("DocumentPreview", () => {
     });
 
     /**
-     * Known gap: `plainText` reads strings and arrays but not element children,
-     * so a cross-reference wrapped in emphasis is not recognised as a defined
-     * term. The transform emits plain labels today, so nothing reaches this
-     * path — but the fallback then sends an in-page fragment to a new tab.
+     * Known gap: `plainText` reads strings and arrays but not element
+     * children, so a cross-reference wrapped in emphasis is not recognised as
+     * a defined term. The transform emits plain labels today, so nothing
+     * reaches this path.
+     *
+     * It used to send the in-page fragment to a new tab, which PL-6 fixed
+     * while generalising this component: the ten document types without
+     * defined terms render every cross-reference as a plain anchor, and an
+     * anchor that opens a blank tab on the same page is no use to anybody.
      */
-    it("does not recognise a defined term wrapped in emphasis", () => {
+    it("leaves a defined term wrapped in emphasis as an in-page link", () => {
       renderPreview("[**Purpose**](#purpose)");
 
       expect(screen.queryByRole("button", { name: "Purpose" })).toBeNull();
-      expect(screen.getByRole("link", { name: "Purpose" })).toHaveAttribute(
-        "target",
-        "_blank",
-      );
+
+      const link = screen.getByRole("link", { name: "Purpose" });
+      expect(link).toHaveAttribute("href", "#purpose");
+      expect(link).not.toHaveAttribute("target");
     });
   });
 

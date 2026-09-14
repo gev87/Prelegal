@@ -1,0 +1,204 @@
+{
+  "ai-addendum": {
+    "name": "AI Addendum",
+    "description": "Layers AI-specific terms onto an existing agreement: how the customer may use AI services, restrictions such as regulated decision-making without human oversight, model training, ownership of input and output, and disclaimers about the nature of AI.",
+    "template_filename": "ai-addendum.md",
+    "party_a": { "path": "partyA", "role": "Customer" },
+    "party_b": { "path": "partyB", "role": "Provider" },
+    "fields": [
+      { "path": "trainingData", "label": "Training Data", "guide": "What data, if any, the provider may use to train a model. Leaving this empty forbids training altogether." },
+      { "path": "trainingPurposes", "label": "Training Purposes", "guide": "What the provider may train a model for. Only meaningful if training data is identified." },
+      { "path": "trainingRestrictions", "label": "Training Restrictions", "guide": "Limits on training beyond the stated purposes. Often empty." },
+      { "path": "improvementRestrictions", "label": "Improvement Restrictions", "guide": "Limits on using input and output to improve the AI system short of training it. Often empty." }
+    ]
+  },
+  "business-associate-agreement": {
+    "name": "Business Associate Agreement",
+    "description": "HIPAA business associate agreement between a covered entity and a service provider handling protected health information, covering obligations, permitted uses and disclosures, breach notification, and term and termination.",
+    "template_filename": "business-associate-agreement.md",
+    "party_a": { "path": "partyA", "role": "Provider" },
+    "party_b": { "path": "partyB", "role": "Company" },
+    "fields": [
+      { "path": "agreement", "label": "Agreement", "guide": "The underlying agreement this BAA attaches to, named so both sides know what it supplements." },
+      { "path": "baaEffectiveDate", "label": "BAA Effective Date", "kind": "date", "guide": "The day this BAA starts." },
+      { "path": "breachNotificationPeriod", "label": "Breach Notification Period", "guide": "How long the provider has to report an impermissible use or disclosure of PHI, such as 5 business days." },
+      { "path": "limitations", "label": "Limitations", "guide": "Any restrictions on the provider passing PHI to subcontractors. Often empty." }
+    ]
+  },
+  "cloud-service-agreement": {
+    "name": "Cloud Service Agreement",
+    "description": "Standard terms for a SaaS or cloud product subscription, covering access and use, support, customer content, fees and payment, term and termination, warranties, limitation of liability, and indemnification.",
+    "template_filename": "cloud-service-agreement.md",
+    "party_a": { "path": "partyA", "role": "Customer" },
+    "party_b": { "path": "partyB", "role": "Provider" },
+    "fields": [
+      { "path": "effectiveDate", "label": "Effective Date", "kind": "date", "guide": "The day the framework terms start." },
+      { "path": "orderDate", "label": "Order Date", "kind": "date", "guide": "The day this particular order starts, which may be later than the effective date." },
+      { "path": "subscriptionPeriod", "label": "Subscription Period", "aliases": ["Subscription Periods"], "guide": "How long each subscription runs before it renews, such as 12 months." },
+      { "path": "nonRenewalNoticeDate", "label": "Non-Renewal Notice Date", "kind": "date", "guide": "The last day either side can give notice to stop the subscription renewing." },
+      { "path": "technicalSupport", "label": "Technical Support", "guide": "What support the provider commits to, and how the customer reaches it." },
+      { "path": "useLimitations", "label": "Use Limitations", "guide": "Caps on how much of the service the customer may use, such as seats, calls or storage." },
+      { "path": "paymentProcess", "label": "Payment Process", "guide": "How the customer is billed and pays: invoicing, card on file, or something else." },
+      { "path": "dpa", "label": "DPA", "guide": "The data processing agreement between the parties, if they have one. Often empty." },
+      { "path": "governingLaw", "label": "Governing Law", "kind": "enum", "enum_ref": "us_state", "guide": "One US state, spelled out in full, whose law governs." },
+      { "path": "chosenCourts", "label": "Chosen Courts", "guide": "Where disputes are heard, such as the state and federal courts in New Castle County, Delaware." },
+      { "path": "generalCapAmount", "label": "General Cap Amount", "guide": "The ceiling on each side's total liability for ordinary claims." },
+      { "path": "increasedClaims", "label": "Increased Claims", "guide": "Which kinds of claim get a higher liability ceiling than the general one. Often empty." },
+      { "path": "increasedCapAmount", "label": "Increased Cap Amount", "guide": "The higher ceiling that applies to increased claims. Meaningless unless increased claims are listed." },
+      { "path": "unlimitedClaims", "label": "Unlimited Claims", "guide": "Which kinds of claim escape the liability caps entirely. Often empty." },
+      { "path": "additionalWarranties", "label": "Additional Warranties", "guide": "Promises either side makes beyond the standard ones. Often empty." },
+      { "path": "providerCoveredClaims", "label": "Provider Covered Claims", "aliases": ["Provider Covered Claim"], "guide": "The claims against the customer that the provider will defend and pay for." },
+      { "path": "customerCoveredClaims", "label": "Customer Covered Claims", "aliases": ["Customer Covered Claim"], "guide": "The claims against the provider that the customer will defend and pay for." }
+    ]
+  },
+  "data-processing-agreement": {
+    "name": "Data Processing Agreement",
+    "description": "GDPR-oriented agreement between a controller and a processor, covering subprocessors, processing instructions, international transfers, security incidents, audits, data subject requests, and deletion.",
+    "template_filename": "data-processing-agreement.md",
+    "party_a": { "path": "partyA", "role": "Provider" },
+    "party_b": { "path": "partyB", "role": "Customer" },
+    "fields": [
+      { "path": "agreement", "label": "Agreement", "guide": "The underlying agreement this DPA attaches to." },
+      { "path": "natureAndPurposeOfProcessing", "label": "Nature and Purpose of Processing", "guide": "What the provider does with the personal data, and why." },
+      { "path": "categoriesOfPersonalData", "label": "Categories of Personal Data", "guide": "What kinds of personal data are processed, such as names, email addresses or usage logs." },
+      { "path": "categoriesOfDataSubjects", "label": "Categories of Data Subjects", "guide": "Whose personal data it is: customers, employees, end users, and so on." },
+      { "path": "specialCategoryData", "label": "Special Category Data", "guide": "Any sensitive data under Article 9, such as health or biometric data. Often empty." },
+      { "path": "specialCategoryDataRestrictionsOrSafeguards", "label": "Special Category Data Restrictions or Safeguards", "guide": "Extra protections applied to special category data. Meaningless unless there is any." },
+      { "path": "durationOfProcessing", "label": "Duration of Processing", "guide": "How long the provider keeps processing the data, usually tied to the underlying agreement." },
+      { "path": "frequencyOfTransfer", "label": "Frequency of Transfer", "guide": "How often data moves across borders: continuously, or on a one-off basis." },
+      { "path": "approvedSubprocessors", "label": "Approved Subprocessors", "guide": "The subprocessors the customer has already approved, or where that list is published." },
+      { "path": "governingMemberState", "label": "Governing Member State", "guide": "The EEA member state whose law governs the standard contractual clauses." },
+      { "path": "securityPolicy", "label": "Security Policy", "guide": "The security standard the provider is audited against, or a link to it." },
+      { "path": "providerSecurityContact", "label": "Provider Security Contact", "guide": "Where the customer sends security questions and audit requests." }
+    ]
+  },
+  "design-partner-agreement": {
+    "name": "Design Partner Agreement",
+    "description": "Early-stage collaboration in which a design partner uses a pre-release product and gives feedback, covering scope of participation, fees, term and termination, warranty disclaimers, confidentiality, and ownership of feedback.",
+    "template_filename": "design-partner-agreement.md",
+    "party_a": { "path": "partyA", "role": "Partner" },
+    "party_b": { "path": "partyB", "role": "Provider" },
+    "fields": [
+      { "path": "effectiveDate", "label": "Effective Date", "kind": "date", "guide": "The day the agreement starts." },
+      { "path": "term", "label": "Term", "guide": "How long the partner keeps early access, such as 6 months." },
+      { "path": "program", "label": "Program", "guide": "What taking part actually involves: what the partner tries, and how they report back." },
+      { "path": "fees", "label": "Fees", "guide": "What the partner pays, if anything. Design partnerships are often free, and an empty answer is a good one." },
+      { "path": "governingLaw", "label": "Governing Law", "kind": "enum", "enum_ref": "us_state", "guide": "One US state, spelled out in full, whose law governs." },
+      { "path": "chosenCourts", "label": "Chosen Courts", "guide": "Where disputes are heard, such as the state and federal courts in New Castle County, Delaware." }
+    ]
+  },
+  "partnership-agreement": {
+    "name": "Partnership Agreement",
+    "description": "Commercial partnership such as a reseller or referral arrangement, covering cooperation, payment and taxes, trademark licence, privacy, escalation, term and termination, warranties, and limitation of liability.",
+    "template_filename": "partnership-agreement.md",
+    "party_a": { "path": "partyA", "role": "Company" },
+    "party_b": { "path": "partyB", "role": "Partner" },
+    "fields": [
+      { "path": "effectiveDate", "label": "Effective Date", "kind": "date", "guide": "The day the partnership starts." },
+      { "path": "endDate", "label": "End Date", "kind": "date", "guide": "The day it ends, unless someone terminates it earlier." },
+      { "path": "obligations", "label": "Obligations", "guide": "What each side actually commits to do. This is the heart of the deal." },
+      { "path": "territory", "label": "Territory", "guide": "Where the partner may use the other side's brand and sell, such as the United States or worldwide." },
+      { "path": "brandGuidelines", "label": "Brand Guidelines", "guide": "Rules for using the other side's name and logo, or a link to them. Often empty." },
+      { "path": "paymentProcess", "label": "Payment Process", "guide": "How one side bills the other for fees." },
+      { "path": "paymentSchedule", "label": "Payment Schedule", "guide": "When those payments fall due, such as net 30 from invoice." },
+      { "path": "dpa", "label": "DPA", "guide": "The data processing agreement between the parties, if they have one. Often empty." },
+      { "path": "governingLaw", "label": "Governing Law", "kind": "enum", "enum_ref": "us_state", "guide": "One US state, spelled out in full, whose law governs." },
+      { "path": "chosenCourts", "label": "Chosen Courts", "guide": "Where disputes are heard, such as the state and federal courts in New Castle County, Delaware." },
+      { "path": "generalCapAmount", "label": "General Cap Amount", "guide": "The ceiling on each side's total liability for ordinary claims." },
+      { "path": "increasedClaims", "label": "Increased Claims", "guide": "Which kinds of claim get a higher liability ceiling than the general one. Often empty." },
+      { "path": "increasedCapAmount", "label": "Increased Cap Amount", "guide": "The higher ceiling that applies to increased claims. Meaningless unless increased claims are listed." },
+      { "path": "unlimitedClaims", "label": "Unlimited Claims", "guide": "Which kinds of claim escape the liability caps entirely. Often empty." },
+      { "path": "additionalWarranties", "label": "Additional Warranties", "guide": "Promises either side makes beyond the standard ones. Often empty." },
+      { "path": "companyCoveredClaim", "label": "Company Covered Claim", "guide": "The claims against the partner that the company will defend and pay for." },
+      { "path": "partnerCoveredClaims", "label": "Partner Covered Claims", "aliases": ["Partner Covered Claim"], "guide": "The claims against the company that the partner will defend and pay for." }
+    ]
+  },
+  "pilot-agreement": {
+    "name": "Pilot Agreement",
+    "description": "Short paid or free trial of a product, covering pilot access and use, user accounts, customer content, feedback, confidentiality, term and termination, and limitation of liability.",
+    "template_filename": "pilot-agreement.md",
+    "party_a": { "path": "partyA", "role": "Customer" },
+    "party_b": { "path": "partyB", "role": "Provider" },
+    "fields": [
+      { "path": "effectiveDate", "label": "Effective Date", "kind": "date", "guide": "The day the pilot starts." },
+      { "path": "pilotPeriod", "label": "Pilot Period", "guide": "How long the customer may use the product for evaluation, such as 60 days." },
+      { "path": "governingLaw", "label": "Governing Law", "kind": "enum", "enum_ref": "us_state", "guide": "One US state, spelled out in full, whose law governs." },
+      { "path": "chosenCourts", "label": "Chosen Courts", "guide": "Where disputes are heard, such as the state and federal courts in New Castle County, Delaware." },
+      { "path": "generalCapAmount", "label": "General Cap Amount", "guide": "The ceiling on each side's total liability." }
+    ]
+  },
+  "professional-services-agreement": {
+    "name": "Professional Services Agreement",
+    "description": "Framework for professional services delivered under statements of work, covering deliverables and acceptance, subcontractors, intellectual property assignment, payment, insurance, warranties, and limitation of liability.",
+    "template_filename": "professional-services-agreement.md",
+    "party_a": { "path": "partyA", "role": "Provider" },
+    "party_b": { "path": "partyB", "role": "Customer" },
+    "fields": [
+      { "path": "effectiveDate", "label": "Effective Date", "kind": "date", "guide": "The day the framework agreement starts." },
+      { "path": "sowTerm", "label": "SOW Term", "guide": "How long a statement of work runs once signed." },
+      { "path": "deliverables", "label": "Deliverables", "aliases": ["Deliverable"], "guide": "What the provider is actually handing over, as distinct from the work itself." },
+      { "path": "rejectionPeriod", "label": "Rejection Period", "guide": "How long the customer has to reject a deliverable before it counts as accepted." },
+      { "path": "resubmissionPeriod", "label": "Resubmission Period", "guide": "How long the provider then has to fix and resubmit it." },
+      { "path": "timeOfAssignment", "label": "Time of Assignment", "guide": "When ownership of the deliverables passes to the customer: on payment, on acceptance, or on creation." },
+      { "path": "fees", "label": "Fees", "guide": "What the customer pays, and on what basis: fixed price, time and materials, or a rate card." },
+      { "path": "paymentPeriod", "label": "Payment Period", "guide": "How long the customer has to pay an invoice, such as net 30." },
+      { "path": "customerObligations", "label": "Customer Obligations", "guide": "What the customer must do for the work to proceed: access, data, people, decisions. Often empty." },
+      { "path": "customerPolicies", "label": "Customer Policies", "guide": "Customer rules the provider must follow on site or on their systems. Often empty." },
+      { "path": "securityPolicy", "label": "Security Policy", "guide": "The security standard the provider must meet, or a link to it. Often empty." },
+      { "path": "insuranceMinimums", "label": "Insurance Minimums", "guide": "The cover each side must carry, if any. Often empty." },
+      { "path": "dpa", "label": "DPA", "guide": "The data processing agreement between the parties, if they have one. Often empty." },
+      { "path": "governingLaw", "label": "Governing Law", "kind": "enum", "enum_ref": "us_state", "guide": "One US state, spelled out in full, whose law governs." },
+      { "path": "chosenCourts", "label": "Chosen Courts", "guide": "Where disputes are heard, such as the state and federal courts in New Castle County, Delaware." },
+      { "path": "generalCapAmount", "label": "General Cap Amount", "guide": "The ceiling on each side's total liability for ordinary claims." },
+      { "path": "increasedClaims", "label": "Increased Claims", "guide": "Which kinds of claim get a higher liability ceiling than the general one. Often empty." },
+      { "path": "increasedCapAmount", "label": "Increased Cap Amount", "guide": "The higher ceiling that applies to increased claims. Meaningless unless increased claims are listed." },
+      { "path": "unlimitedClaims", "label": "Unlimited Claims", "guide": "Which kinds of claim escape the liability caps entirely. Often empty." },
+      { "path": "additionalWarranties", "label": "Additional Warranties", "guide": "Promises either side makes beyond the standard ones. Often empty." },
+      { "path": "providerCoveredClaims", "label": "Provider Covered Claims", "aliases": ["Provider Covered Claim"], "guide": "The claims against the customer that the provider will defend and pay for." },
+      { "path": "customerCoveredClaims", "label": "Customer Covered Claims", "aliases": ["Customer Covered Claim"], "guide": "The claims against the provider that the customer will defend and pay for." }
+    ]
+  },
+  "service-level-agreement": {
+    "name": "Service Level Agreement",
+    "description": "Defines the uptime commitment and how availability and downtime are measured, support response time targets, and the service credits available when a commitment is missed.",
+    "template_filename": "service-level-agreement.md",
+    "party_a": { "path": "partyA", "role": "Provider" },
+    "party_b": { "path": "partyB", "role": "Customer" },
+    "fields": [
+      { "path": "targetUptime", "label": "Target Uptime", "guide": "The availability the provider commits to each month, such as 99.9 percent." },
+      { "path": "uptimeCredit", "label": "Uptime Credit", "guide": "What the customer gets back when uptime falls short, usually a percentage of the monthly fee." },
+      { "path": "scheduledDowntime", "label": "Scheduled Downtime", "guide": "Planned maintenance windows that do not count against uptime. Often empty." },
+      { "path": "targetResponseTime", "label": "Target Response Time", "guide": "How quickly the provider acknowledges a support request, such as 4 business hours." },
+      { "path": "responseTimeCredit", "label": "Response Time Credit", "guide": "What the customer gets back when a response target is missed." },
+      { "path": "supportChannel", "label": "Support Channel", "guide": "Where the customer sends support requests: an email address, a portal, or a phone number." },
+      { "path": "subscriptionPeriod", "label": "Subscription Period", "guide": "The billing period uptime is measured against, taken from the underlying subscription." }
+    ]
+  },
+  "software-license-agreement": {
+    "name": "Software License Agreement",
+    "description": "Licence for software installed and run by the customer, covering the licence grant and limits, restrictions, support, fees, warranties, indemnification, and limitation of liability.",
+    "template_filename": "software-license-agreement.md",
+    "party_a": { "path": "partyA", "role": "Customer" },
+    "party_b": { "path": "partyB", "role": "Provider" },
+    "fields": [
+      { "path": "effectiveDate", "label": "Effective Date", "kind": "date", "guide": "The day the framework terms start." },
+      { "path": "orderDate", "label": "Order Date", "kind": "date", "guide": "The day this particular order starts, which may be later than the effective date." },
+      { "path": "subscriptionPeriod", "label": "Subscription Period", "aliases": ["Subscription Periods"], "guide": "How long the licence runs before it renews, such as 12 months." },
+      { "path": "nonRenewalNoticeDate", "label": "Non-Renewal Notice Date", "kind": "date", "guide": "The last day either side can give notice to stop the licence renewing." },
+      { "path": "permittedUses", "label": "Permitted Uses", "guide": "What the customer is allowed to do with the software, and on whose systems." },
+      { "path": "licenseLimits", "label": "License Limits", "guide": "Caps on the licence: seats, installations, cores, environments." },
+      { "path": "warrantyPeriod", "label": "Warranty Period", "guide": "How long the provider warrants the software matches its specifications." },
+      { "path": "deletionProcedure", "label": "Deletion Procedure", "guide": "How the customer removes the software when the licence ends." },
+      { "path": "paymentProcess", "label": "Payment Process", "guide": "How the customer is billed and pays: invoicing, card on file, or something else." },
+      { "path": "governingLaw", "label": "Governing Law", "kind": "enum", "enum_ref": "us_state", "guide": "One US state, spelled out in full, whose law governs." },
+      { "path": "chosenCourts", "label": "Chosen Courts", "guide": "Where disputes are heard, such as the state and federal courts in New Castle County, Delaware." },
+      { "path": "generalCapAmount", "label": "General Cap Amount", "guide": "The ceiling on each side's total liability for ordinary claims." },
+      { "path": "increasedClaims", "label": "Increased Claims", "guide": "Which kinds of claim get a higher liability ceiling than the general one. Often empty." },
+      { "path": "increasedCapAmount", "label": "Increased Cap Amount", "guide": "The higher ceiling that applies to increased claims. Meaningless unless increased claims are listed." },
+      { "path": "unlimitedClaims", "label": "Unlimited Claims", "guide": "Which kinds of claim escape the liability caps entirely. Often empty." },
+      { "path": "additionalWarranties", "label": "Additional Warranties", "guide": "Promises either side makes beyond the standard ones. Often empty." },
+      { "path": "providerCoveredClaims", "label": "Provider Covered Claims", "aliases": ["Provider Covered Claim"], "guide": "The claims against the customer that the provider will defend and pay for." },
+      { "path": "customerCoveredClaims", "label": "Customer Covered Claims", "aliases": ["Customer Covered Claim"], "guide": "The claims against the provider that the customer will defend and pay for." }
+    ]
+  }
+}

@@ -7,7 +7,7 @@ import {
   type ChatMessage,
 } from "@/lib/chat";
 import { createDefaultFields } from "@/lib/nda/schema";
-import { completeFields } from "../fixtures/fields";
+import { asDocumentFields, completeFields } from "../fixtures/fields";
 
 const TODAY = "2026-03-14";
 
@@ -29,8 +29,12 @@ function jsonResponse(status: number, body: unknown): Response {
 function aTurn(overrides: Record<string, unknown> = {}) {
   return {
     reply: "Understood.",
+    documentType: "mutual-nda",
+    documentTypeName: "Mutual NDA",
     fields: completeFields({ effectiveDate: TODAY }),
     updatedFields: ["purpose"],
+    carriedFields: [],
+    droppedFields: [],
     ...overrides,
   };
 }
@@ -38,7 +42,8 @@ function aTurn(overrides: Record<string, unknown> = {}) {
 function aRequest(messages: ChatMessage[] = [{ role: "user", content: "Hello." }]) {
   return {
     messages,
-    fields: createDefaultFields(TODAY),
+    documentType: "mutual-nda",
+    fields: asDocumentFields(createDefaultFields(TODAY)),
     confirmedFields: [],
     today: TODAY,
   };
@@ -167,25 +172,65 @@ describe("sendChatTurn", () => {
         },
       ],
       [
-        "a governing law that is not text",
+        "a field holding something the renderer cannot print",
         {
           reply: "Hi.",
-          fields: { ...completeFields(), governingLaw: 7 },
+          fields: { ...completeFields(), purpose: ["not", "text"] },
           updatedFields: [],
         },
+      ],
+      ["no document type", { reply: "Hi.", fields: completeFields(), updatedFields: [] }],
+      [
+        "a document type that is not text",
+        { ...aTurn(), documentType: 7 },
       ],
       [
-        "a term of years that is text",
-        {
-          reply: "Hi.",
-          fields: { ...completeFields(), mndaTermYears: "two" },
-          updatedFields: [],
-        },
+        "a document name that is neither text nor absent",
+        { ...aTurn(), documentTypeName: 7 },
       ],
+      ["no list of what carried", { ...aTurn(), carriedFields: undefined }],
+      ["no list of what was dropped", { ...aTurn(), droppedFields: undefined }],
     ])("rejects %s", async (_name, body) => {
       fetchMock.mockResolvedValueOnce(jsonResponse(200, body));
 
       await expect(sendChatTurn(aRequest())).rejects.toBeInstanceOf(ChatFailedError);
+    });
+
+    /**
+     * The shape check is about values, not names: there are eleven cover
+     * pages and a list of one document's field names here could only reject
+     * the other ten. What it still catches is anything the renderer would
+     * choke on — which is why a party that is null is refused and a
+     * governing law holding a number is not.
+     */
+    it("accepts a cover page it has never seen the shape of", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(200, {
+          ...aTurn(),
+          documentType: "pilot-agreement",
+          documentTypeName: "Pilot Agreement",
+          fields: { pilotPeriod: "60 days", partyA: { company: "Acme", signatoryName: "Dana", signatoryTitle: "CEO", noticeAddress: "legal@acme.com" } },
+        }),
+      );
+
+      const turn = await sendChatTurn(aRequest());
+
+      expect(turn.documentType).toBe("pilot-agreement");
+    });
+
+    it("accepts an empty cover page while no document has been chosen", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(200, {
+          ...aTurn(),
+          documentType: "undetermined",
+          documentTypeName: null,
+          fields: {},
+        }),
+      );
+
+      const turn = await sendChatTurn(aRequest());
+
+      expect(turn.documentTypeName).toBeNull();
     });
 
     it("rejects a body that is not JSON at all", async () => {

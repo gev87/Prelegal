@@ -25,6 +25,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from app.field_paths import read_leaf, write_leaf
+
 #: Section 9 of the Standard Terms reads "the laws of the State of …", so the
 #: value is the state's full name. Verbatim from ``US_STATES`` in
 #: ``frontend/lib/nda/schema.ts``, in the same order.
@@ -124,18 +126,7 @@ class FieldPath(StrEnum):
     PARTY_TWO_NOTICE_ADDRESS = "partyTwo.noticeAddress"
 
 
-def read_leaf(fields: NdaFields, path: FieldPath) -> object:
-    """The value at ``path``. Only ever one level deep — the cover page has
-    no nesting beyond the two parties."""
-    head, _, tail = path.value.partition(".")
-    owner = getattr(fields, head)
-    return getattr(owner, tail) if tail else owner
-
-
-def write_leaf(fields: NdaFields, path: FieldPath, value: object) -> None:
-    """Sets the value at ``path``, in place."""
-    head, _, tail = path.value.partition(".")
-    if tail:
-        setattr(getattr(fields, head), tail, value)
-    else:
-        setattr(fields, head, value)
+# ``read_leaf``/``write_leaf`` used to live here. PL-6 moved them to
+# ``app.field_paths`` when every document type grew its own field paths and
+# they stopped being about the Mutual NDA. Re-exported rather than relocated
+# outright so existing imports of ``app.nda_fields.read_leaf`` keep working.
