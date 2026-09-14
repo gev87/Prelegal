@@ -20,8 +20,12 @@ describe("NdaEntry", () => {
 
     render(<NdaEntry standardTerms={FAKE_STANDARD_TERMS} />);
 
+    // Read off the document itself, which is now the only place the date is
+    // shown — the cover page renders it in words.
     await waitFor(() =>
-      expect(screen.getByLabelText("Effective date")).toHaveValue("2026-05-01"),
+      expect(screen.getByRole("region", { name: "Agreement preview" })).toHaveTextContent(
+        "May 1, 2026",
+      ),
     );
   });
 

@@ -71,7 +71,25 @@ if ($LASTEXITCODE -ne 0) { Write-Host "docker build failed." -ForegroundColor Re
 # starting twice in a row never fails with "name already in use".
 docker rm -f $Container *> $null
 
-docker run -d --name $Container -p "${Port}:8000" $Image *> $null
+# The assistant's key, from the environment or from an untracked .env file at
+# the repository root. Absent is not an error: the product runs without it,
+# and only the chat panel reports itself unavailable.
+$Key = $env:OPENROUTER_API_KEY
+if (-not $Key -and (Test-Path ".env")) {
+    # Only this one name, and only the part after the first "=", so a value
+    # containing "=" survives and nothing else in the file is executed.
+    $Line = Select-String -Path ".env" -Pattern '^OPENROUTER_API_KEY=' | Select-Object -First 1
+    if ($Line) { $Key = ($Line.Line -split '=', 2)[1].Trim().Trim('"') }
+}
+
+if (-not $Key) {
+    Write-Host "No OPENROUTER_API_KEY found, so the AI chat will be unavailable." -ForegroundColor Yellow
+    Write-Host "Set it in your shell or in .env - see .env.example."
+}
+
+# Passed at run time, never baked in with ENV: a key in a layer is a key in
+# every copy of the image.
+docker run -d --name $Container -p "${Port}:8000" -e "OPENROUTER_API_KEY=$Key" $Image *> $null
 if ($LASTEXITCODE -ne 0) { Write-Host "docker run failed." -ForegroundColor Red; exit 1 }
 
 Wait-UntilReady

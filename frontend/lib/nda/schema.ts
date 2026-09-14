@@ -8,7 +8,6 @@
 
 export type MndaTermMode = "fixed" | "until-terminated";
 export type ConfidentialityMode = "fixed" | "perpetual";
-export type PartySlot = "partyOne" | "partyTwo";
 
 export interface Party {
   company: string;
@@ -83,8 +82,6 @@ export interface DefinedTerm {
   label: string;
   /** GFM heading anchor of the cover-page section that defines it. */
   anchor: string;
-  /** DOM id of the form group that edits it. */
-  fieldId: string;
 }
 
 export const DEFINED_TERMS: Record<DefinedTermKey, DefinedTerm> = {
@@ -92,37 +89,31 @@ export const DEFINED_TERMS: Record<DefinedTermKey, DefinedTerm> = {
     key: "purpose",
     label: "Purpose",
     anchor: "#purpose",
-    fieldId: "field-purpose",
   },
   effectiveDate: {
     key: "effectiveDate",
     label: "Effective Date",
     anchor: "#effective-date",
-    fieldId: "field-effective-date",
   },
   mndaTerm: {
     key: "mndaTerm",
     label: "MNDA Term",
     anchor: "#mnda-term",
-    fieldId: "field-mnda-term",
   },
   confidentiality: {
     key: "confidentiality",
     label: "Term of Confidentiality",
     anchor: "#term-of-confidentiality",
-    fieldId: "field-confidentiality",
   },
   governingLaw: {
     key: "governingLaw",
     label: "Governing Law",
     anchor: "#governing-law--jurisdiction",
-    fieldId: "field-governing-law",
   },
   jurisdiction: {
     key: "jurisdiction",
     label: "Jurisdiction",
     anchor: "#governing-law--jurisdiction",
-    fieldId: "field-jurisdiction",
   },
 };
 
@@ -141,23 +132,35 @@ export const DEFINED_TERM_BY_LABEL: Record<string, DefinedTerm> = Object.fromEnt
 export type FieldErrors = Record<string, string>;
 
 /**
- * Maps each validation error onto the form group that fixes it. Insertion
- * order is the order the form jumps through on a failed download.
+ * Names each validation error in the words the assistant uses when it asks
+ * for the answer. Insertion order is cover page top to bottom, then the two
+ * parties — the order a reader would work through the document, and so the
+ * order the assistant asks in when several answers are outstanding.
  */
-export const ERROR_FIELD_IDS: Record<string, string> = {
-  purpose: "field-purpose",
-  effectiveDate: "field-effective-date",
-  mndaTermYears: "field-mnda-term",
-  confidentialityYears: "field-confidentiality",
-  governingLaw: "field-governing-law",
-  jurisdiction: "field-jurisdiction",
-  "partyOne.company": "field-party-one-company",
-  "partyOne.signatoryName": "field-party-one-name",
-  "partyOne.noticeAddress": "field-party-one-notice",
-  "partyTwo.company": "field-party-two-company",
-  "partyTwo.signatoryName": "field-party-two-name",
-  "partyTwo.noticeAddress": "field-party-two-notice",
+export const ERROR_LABELS: Record<string, string> = {
+  purpose: "the purpose",
+  effectiveDate: "the effective date",
+  mndaTermYears: "how long the agreement runs",
+  confidentialityYears: "how long confidentiality lasts",
+  governingLaw: "the governing law",
+  jurisdiction: "the jurisdiction",
+  "partyOne.company": "the first company's name",
+  "partyOne.signatoryName": "who signs for the first company",
+  "partyOne.noticeAddress": "the first company's address for notices",
+  "partyTwo.company": "the second company's name",
+  "partyTwo.signatoryName": "who signs for the second company",
+  "partyTwo.noticeAddress": "the second company's address for notices",
 };
+
+/**
+ * The outstanding answers, in reading order, as a list that can be dropped
+ * into a sentence. Empty when the document is ready to sign.
+ */
+export function describeMissingFields(errors: FieldErrors): string[] {
+  return Object.keys(ERROR_LABELS)
+    .filter((name) => errors[name])
+    .map((name) => ERROR_LABELS[name]);
+}
 
 export function validateFields(fields: NdaFields): FieldErrors {
   const errors: FieldErrors = {};

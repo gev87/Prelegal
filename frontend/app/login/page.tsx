@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, type FormEvent } from "react";
 
-import { apiUrl } from "@/lib/api";
+import { apiUrl, describeFailure } from "@/lib/api";
 
 type Mode = "signin" | "signup";
 
@@ -140,21 +140,4 @@ export default function LoginPage() {
       </div>
     </main>
   );
-}
-
-/**
- * The message to show for a failed request.
- *
- * FastAPI answers a rejected value with `detail` as a list of problems
- * rather than a string, so the string case cannot be assumed — rendering the
- * list object would put "[object Object]" in front of the user.
- */
-async function describeFailure(response: Response): Promise<string> {
-  const body = await response.json().catch(() => null);
-  const detail = body?.detail;
-
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail) && typeof detail[0]?.msg === "string") return detail[0].msg;
-
-  return "Something went wrong. Please try again.";
 }

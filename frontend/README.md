@@ -1,11 +1,13 @@
 # Prelegal frontend
 
-A Next.js app that turns a short form into a complete, signable
+A Next.js app that turns a conversation into a complete, signable
 [Common Paper Mutual NDA](https://commonpaper.com/standards/mutual-nda/1.0).
 
-You fill in the cover page details, the agreement renders live beside the form,
-and you download it as Markdown or PDF. There is also a login screen, which is
-deliberately not a gate — see [Signing in](#signing-in).
+You talk to an assistant, which asks what the agreement is for and who is
+signing and fills in the cover page as you answer. The agreement renders live
+beside the conversation, and you download it as Markdown or PDF. There is also
+a login screen, which is deliberately not a gate — see
+[Signing in](#signing-in).
 
 ## Running it
 
@@ -14,8 +16,13 @@ npm install
 npm run dev
 ```
 
-Then open <http://localhost:3000>. Start the backend too if you want the login
-screen to work — see [`backend/README.md`](../backend/README.md).
+Then open <http://localhost:3000>. Start the backend too — the login screen
+and the assistant both need it, and the assistant additionally needs
+`OPENROUTER_API_KEY` set in the backend's shell. See
+[`backend/README.md`](../backend/README.md).
+
+Without a key the chat reports itself unavailable and everything else works,
+which is the intended behaviour rather than a broken state.
 
 The app reads its templates from the repository's `templates/` directory, so it
 has to run from inside the Prelegal checkout rather than on its own.
@@ -51,6 +58,35 @@ not the server's.
 `out/login.html`, and a request for `/login` matches no file — the backend
 answers with the 404 page instead of the login screen.
 
+## Drafting by conversation
+
+`components/ChatPanel.tsx` owns the transcript and the composer; `lib/chat.ts`
+owns the call to `POST /api/chat`. `NdaCreator` still owns the cover page
+itself, and the assistant reaches it through one `onFieldsChange` callback —
+the same single state update the form used to make on every keystroke, now
+made once per reply.
+
+Three things about it are deliberate.
+
+**The backend remembers nothing.** Every turn sends the whole transcript and
+the whole cover page. The transcript is a few kilobytes next to what the model
+costs, and in exchange there is no session to expire and a restart loses
+nothing.
+
+**The app's own messages are never sent to the model.** The opening greeting
+and the note about what a blocked download still needs are written here, not
+generated, and carry a `local` flag so `sendChatTurn` filters them out. Feeding
+them back would let the model build on words it never wrote.
+
+**What the assistant changes is checked on the server, not trusted.** It
+returns the whole cover page *and* a list of what it changed, and the backend
+applies only the listed fields. See `backend/README.md` — that asymmetry is
+what stops a model from quietly rewriting an answer somebody already settled.
+
+A blocked download is answered here rather than by the model: `validateFields`
+already knows what is missing, so asking would cost a turn, and a server with
+no key still has to be able to explain why the button did nothing.
+
 ## Signing in
 
 `/login` signs up and signs in against the backend for real, and shows the
@@ -85,9 +121,10 @@ relationship…". Substituting the value inline would produce broken prose, so
 each reference stays a defined term and links to the cover-page heading that
 defines it.
 
-In the preview those references are interactive: hover one to see the value you
-set, click it to jump to the field that controls it. It is the same wiring the
-document itself relies on, made visible.
+In the preview those references are interactive: hover one to see the value
+you set, click it to start a question about it in the chat. The click seeds the
+message box rather than sending it — reading the document should not spend a
+turn, or the reader's money.
 
 ## Downloads
 
@@ -109,20 +146,21 @@ app/
   layout.tsx            Fonts and metadata
   globals.css           Design tokens, document styles, print rules, login
 components/
-  NdaCreator.tsx        Client shell — holds field state, wires form to preview
-  NdaForm.tsx           The cover-page form
+  NdaCreator.tsx        Client shell — holds field state, wires chat to preview
+  ChatPanel.tsx         The conversation: transcript, composer, failure states
   DocumentPreview.tsx   Markdown render, with live defined terms
   DownloadBar.tsx       Markdown and PDF actions
 lib/
-  api.ts                Where the API lives, in dev and in the container
+  api.ts                Where the API lives, and how a failure reads
+  chat.ts               The /api/chat call, and what it refuses to believe
   date.ts               Today, in the visitor's own calendar
   nda/
     schema.ts           Field types, defaults, validation, defined-term table
     render.ts           Merges fields and standard terms into the document
     templates.ts        Server-only reader for ../templates
 test/
-  unit/                 Schema, renderer, template reader, dates, API URLs
-  components/           Form, preview and creator under jsdom
+  unit/                 Schema, renderer, template reader, dates, API, chat
+  components/           Chat, preview and creator under jsdom
   app/                  The login screen and the date wrapper
   fixtures/             Shared field builders and a miniature template
 docs/

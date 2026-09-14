@@ -1,21 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
+import ChatPanel, { type ChatPanelHandle } from "@/components/ChatPanel";
 import DocumentPreview from "@/components/DocumentPreview";
 import DownloadBar from "@/components/DownloadBar";
-import NdaForm from "@/components/NdaForm";
 import { documentFilename, renderMnda } from "@/lib/nda/render";
 import {
   createDefaultFields,
-  DEFINED_TERMS,
-  ERROR_FIELD_IDS,
+  describeMissingFields,
   validateFields,
   type DefinedTermKey,
-  type FieldErrors,
-  type NdaFields,
-  type Party,
-  type PartySlot,
 } from "@/lib/nda/schema";
 
 interface NdaCreatorProps {
@@ -24,17 +19,12 @@ interface NdaCreatorProps {
   today: string;
 }
 
-type MobileView = "form" | "document";
-
-const FLASH_DURATION_MS = 1400;
+type MobileView = "chat" | "document";
 
 export default function NdaCreator({ standardTerms, today }: NdaCreatorProps) {
   const [fields, setFields] = useState(() => createDefaultFields(today));
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [showAllErrors, setShowAllErrors] = useState(false);
-  const [mobileView, setMobileView] = useState<MobileView>("form");
-  const [flashedFieldId, setFlashedFieldId] = useState<string | null>(null);
-  const flashTimer = useRef<number | undefined>(undefined);
+  const [mobileView, setMobileView] = useState<MobileView>("chat");
+  const chat = useRef<ChatPanelHandle>(null);
 
   const errors = useMemo(() => validateFields(fields), [fields]);
   const markdown = useMemo(
@@ -43,85 +33,39 @@ export default function NdaCreator({ standardTerms, today }: NdaCreatorProps) {
   );
 
   /**
-   * Every party field starts empty, so showing all twelve errors on first
-   * paint would just be noise. An error appears once its field has been
-   * visited, or once a download has been attempted.
+   * Clicking a defined term in the document asks the assistant about it.
+   *
+   * It used to scroll the form to the field that set it. With no form, the
+   * equivalent is to bring the reader to the one place that can still change
+   * it — the panel seeds the question rather than sending it, so reading the
+   * document never spends a turn.
    */
-  const visibleErrors: FieldErrors = useMemo(() => {
-    if (showAllErrors) return errors;
-    return Object.fromEntries(
-      Object.entries(errors).filter(([name]) => touched[name]),
-    );
-  }, [errors, touched, showAllErrors]);
-
-  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
-
-  const revealField = useCallback((fieldId: string) => {
-    setMobileView("form");
-
-    // Wait a frame so the form is on screen before scrolling to it.
-    window.requestAnimationFrame(() => {
-      const group = document.getElementById(fieldId);
-      if (!group) return;
-
-      const reducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-
-      group.scrollIntoView({
-        behavior: reducedMotion ? "auto" : "smooth",
-        block: "center",
-      });
-      group
-        .querySelector<HTMLElement>("input:not([disabled]), textarea, select")
-        ?.focus({ preventScroll: true });
-
-      setFlashedFieldId(fieldId);
-      window.clearTimeout(flashTimer.current);
-      flashTimer.current = window.setTimeout(
-        () => setFlashedFieldId(null),
-        FLASH_DURATION_MS,
-      );
-    });
+  const handleTermSelect = useCallback((key: DefinedTermKey) => {
+    setMobileView("chat");
+    chat.current?.askAboutTerm(key);
   }, []);
 
-  const handleTermSelect = useCallback(
-    (key: DefinedTermKey) => revealField(DEFINED_TERMS[key].fieldId),
-    [revealField],
-  );
-
-  const handleChange = useCallback((patch: Partial<NdaFields>) => {
-    setFields((previous) => ({ ...previous, ...patch }));
-  }, []);
-
-  const handlePartyChange = useCallback(
-    (slot: PartySlot, patch: Partial<Party>) => {
-      setFields((previous) => ({
-        ...previous,
-        [slot]: { ...previous[slot], ...patch },
-      }));
-    },
-    [],
-  );
-
-  const handleFieldBlur = useCallback((name: string) => {
-    setTouched((previous) => ({ ...previous, [name]: true }));
-  }, []);
-
-  /** Downloads are blocked until the document is complete enough to sign. */
+  /**
+   * Downloads are blocked until the document is complete enough to sign.
+   *
+   * The assistant says what is outstanding, in the words it would use to ask
+   * for them. Worked out here rather than asked of the model: the answer is
+   * already known, and a server with no key still has to be able to explain
+   * why the button did nothing.
+   */
   const withCompleteDocument = useCallback(
     (download: () => void) => {
-      const firstProblem = Object.keys(ERROR_FIELD_IDS).find((name) => errors[name]);
+      const missing = describeMissingFields(errors);
 
-      if (firstProblem) {
-        setShowAllErrors(true);
-        revealField(ERROR_FIELD_IDS[firstProblem]);
+      if (missing.length > 0) {
+        setMobileView("chat");
+        chat.current?.reportMissing(missing);
         return;
       }
 
       download();
     },
-    [errors, revealField],
+    [errors],
   );
 
   const downloadMarkdown = useCallback(() => {
@@ -158,8 +102,8 @@ export default function NdaCreator({ standardTerms, today }: NdaCreatorProps) {
 
         <div className="view-switch">
           <ViewSwitchOption
-            label="Details"
-            view="form"
+            label="Chat"
+            view="chat"
             active={mobileView}
             onSelect={setMobileView}
           />
@@ -179,16 +123,14 @@ export default function NdaCreator({ standardTerms, today }: NdaCreatorProps) {
 
       <div className="panes">
         <section
-          className={`pane pane-form${mobileView === "form" ? "" : " pane-hidden"}`}
-          aria-label="Agreement details"
+          className={`pane pane-chat${mobileView === "chat" ? "" : " pane-hidden"}`}
+          aria-label="Drafting assistant"
         >
-          <NdaForm
+          <ChatPanel
+            ref={chat}
             fields={fields}
-            errors={visibleErrors}
-            flashedFieldId={flashedFieldId}
-            onChange={handleChange}
-            onPartyChange={handlePartyChange}
-            onFieldBlur={handleFieldBlur}
+            today={today}
+            onFieldsChange={setFields}
           />
         </section>
 
