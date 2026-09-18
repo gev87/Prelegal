@@ -88,13 +88,30 @@ describe("every catalogued document type", () => {
     expect(documents).toHaveLength(10);
   });
 
-  it("leaves no cover-page markup unresolved", () => {
+  it("leaves no markup unresolved", () => {
     // A leftover span renders as visible angle brackets in the middle of a
-    // signed agreement.
+    // signed agreement — react-markdown does not render raw HTML, so it prints
+    // the tag instead.
+    //
+    // Deliberately every span rather than only the `*_link` ones this file
+    // used to check. That narrower assertion passed for two tickets while the
+    // ten agreements each carried dozens of visible `<span class="header_2">`
+    // tags, because nothing transformed a class nobody had thought about. Any
+    // span at all is the assertion that would have caught it.
     for (const doc of documents) {
       const markdown = transformStandardTerms(doc);
-      expect(markdown, doc.slug).not.toMatch(/<span class="[a-z_]*_link">/);
+      expect(markdown, doc.slug).not.toMatch(/<span/);
     }
+  });
+
+  it("writes clause titles as text rather than as markup", () => {
+    // The transform is only right if the titles survive it: stripping the
+    // spans entirely would also satisfy the assertion above.
+    const pilot = documents.find((doc) => doc.slug === "pilot-agreement");
+    const markdown = transformStandardTerms(pilot!);
+
+    expect(markdown).toContain("**Pilot Access**");
+    expect(markdown).toContain("**Access and Use.**");
   });
 
   it("points every cross-reference at a heading the cover page writes", () => {

@@ -42,6 +42,35 @@ const COVER_PAGE_SPAN =
   /<span class="(?:coverpage_link|keyterms_link|orderform_link|sow_link|businessterms_link)">([^<]*)<\/span>/g;
 
 /**
+ * The other thing Common Paper wraps in a span: the title of a section or a
+ * clause, carrying its number as an `id`.
+ *
+ * These sit *inside* the Markdown ordered list that already numbers them —
+ * `1. <span class="header_2" id="1">Pilot Access</span>` — so they become bold
+ * rather than headings. A real heading would end the list and restart the
+ * numbering at the next item.
+ */
+const CLAUSE_TITLE_SPAN =
+  /<span class="header_[23]"[^>]*>([^<]*)<\/span>/g;
+
+/**
+ * Every span tag still standing once the two above have had their turn.
+ *
+ * The templates also wrap things in spans that carry nothing but an `id`: a
+ * clause with no title, a defined term in the definitions list. Neither needs
+ * transforming — the content inside them is already what should be read — so
+ * the tags go and the content stays.
+ *
+ * Deliberately a catch-all rather than a list of the shapes seen so far. That
+ * list is what let `header_2` reach ten signed agreements: the transform only
+ * knew about classes somebody had thought of, and anything new passed through
+ * to the page as visible angle brackets. Matching `</?span` also sweeps up the
+ * unbalanced `</span>` in `cloud-service-agreement.md`'s definition of
+ * "Variable", which no well-formed pattern would catch.
+ */
+const ANY_REMAINING_SPAN = /<\/?span[^>]*>/g;
+
+/**
  * What every document says about itself before anybody signs it.
  *
  * One sentence, in one place, because it has to reach three surfaces that are
@@ -186,6 +215,9 @@ export function transformStandardTerms(doc: DocumentType): string {
     // Demote the template's own title so the finished agreement has a single
     // H1 — the cover page's — exactly as the NDA's renderer does.
     .replace(/^#\s+(?!#)(.*)$/m, "## $1")
+    // Clause titles first, because the catch-all at the end would otherwise
+    // take their tags away before they could become bold.
+    .replace(CLAUSE_TITLE_SPAN, (_match, title: string) => `**${title.trim()}**`)
     .replace(COVER_PAGE_SPAN, (_match, raw: string) => {
       const label = raw.trim();
       const bare = label.replace(/[’']s$/, "");
@@ -196,7 +228,10 @@ export function transformStandardTerms(doc: DocumentType): string {
 
       const anchor = anchors.get(bare);
       return anchor ? `[${label}](${anchor})` : label;
-    });
+    })
+    // Last, so that everything with a meaning has already been given one and
+    // what is left is markup with nothing to say.
+    .replace(ANY_REMAINING_SPAN, "");
 }
 
 /**

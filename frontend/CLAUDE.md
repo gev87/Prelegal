@@ -134,7 +134,7 @@ PL-6 made that guarantee tighter rather than looser. The field-path enum is buil
 
 ### Working on this
 
-- Tests: `cd backend && uv run pytest` (277), `cd frontend && npm test` (415). `npm run verify` runs typecheck, lint, test and build.
+- Tests: `cd backend && uv run pytest` (277), `cd frontend && npm test` (416). `npm run verify` runs typecheck, lint, test and build.
 - `OPENROUTER_API_KEY` makes the assistant answer; see `.env.example`. Without it everything but the chat works, and the tests do not need it — the model is faked at two levels.
 - Native development runs the two halves separately — `next dev` on 3000, `uv run uvicorn app.main:app` on 8000 — and is the only case where CORS applies.
 - Editing a template needs an image rebuild, not a restart: they are baked in at build time. `backend/app/document_fields.json` is read by the frontend at build time *and* by the backend at startup, so editing it needs a rebuild too — and `backend/tests/test_document_types.py` checks it still describes the templates in both directions, so a template correction fails the suite rather than drifting quietly.
