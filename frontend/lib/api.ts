@@ -36,6 +36,30 @@ export async function describeFailure(response: Response): Promise<string> {
   return "Something went wrong. Please try again.";
 }
 
+/**
+ * Every call to the API, so that none of them forgets the session.
+ *
+ * `credentials: "include"` is the whole reason this exists. The session cookie
+ * is set by FastAPI and sent back by the browser automatically — but only
+ * same-origin, which is exactly what the container is. Under `next dev` the
+ * page is on port 3000 and the API on 8000, so a call without this flag
+ * silently drops the cookie and the visitor looks signed out. It fails in
+ * development and works in production, which is the worst way round for a bug
+ * to behave, so the flag lives here rather than at each call site where one
+ * can be missed.
+ *
+ * `Content-Type` is set for the same reason it was repeated at every call site
+ * before: FastAPI needs it to parse a JSON body. It is still overridable, for
+ * a caller that sends something else.
+ */
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(apiUrl(path), {
+    ...init,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...init.headers },
+  });
+}
+
 export function apiUrl(path: string): string {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return `${process.env.NEXT_PUBLIC_API_BASE_URL}${path}`;

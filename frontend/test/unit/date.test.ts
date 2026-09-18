@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isoToday } from "@/lib/date";
+import { formatSavedAt, isoToday } from "@/lib/date";
 
 afterEach(() => vi.useRealTimers());
 
@@ -33,5 +33,35 @@ describe("isoToday", () => {
     expect(isoToday(lateEvening)).toBe(
       `${lateEvening.getFullYear()}-03-${String(lateEvening.getDate()).padStart(2, "0")}`,
     );
+  });
+});
+
+describe("formatSavedAt", () => {
+  /**
+   * SQLite writes `datetime('now')` as `YYYY-MM-DD HH:MM:SS` and says nowhere
+   * that it is UTC. Handed to `new Date()` unchanged, most browsers read it as
+   * local time, which silently shifts every timestamp by the reader's offset.
+   */
+  it("reads the stored timestamp as UTC", () => {
+    const utcNoon = formatSavedAt("2026-03-14 12:00:00", "en-GB");
+    const sameMoment = new Date("2026-03-14T12:00:00Z").toLocaleString("en-GB", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    expect(utcNoon).toBe(sameMoment);
+  });
+
+  it("formats it for a reader rather than a database", () => {
+    expect(formatSavedAt("2026-03-14 12:00:00", "en-GB")).toContain("2026");
+    expect(formatSavedAt("2026-03-14 12:00:00", "en-GB")).not.toContain("12:00:00");
+  });
+
+  /**
+   * It came from the server, so showing it raw at least says what arrived.
+   * "Invalid Date" in a list of documents says nothing at all.
+   */
+  it("returns an unparseable value unchanged", () => {
+    expect(formatSavedAt("not a timestamp")).toBe("not a timestamp");
   });
 });

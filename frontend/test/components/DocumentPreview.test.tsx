@@ -210,4 +210,46 @@ describe("DocumentPreview", () => {
       renderPreview(renderMnda(completeFields(), FAKE_STANDARD_TERMS)),
     ).not.toThrow();
   });
+
+  /**
+   * The saved-document viewer renders the same preview with nowhere to send an
+   * edit, so a defined term explains itself but is not a control. Offering a
+   * button that cannot change anything would be worse than offering none.
+   */
+  describe("with no way to edit a term", () => {
+    function renderReadOnly(markdown: string) {
+      return render(
+        <DocumentPreview markdown={markdown} ndaFields={completeFields()} />,
+      );
+    }
+
+    it("is not a button", () => {
+      renderReadOnly("[Purpose](#purpose)");
+
+      expect(screen.queryByRole("button", { name: "Purpose" })).toBeNull();
+    });
+
+    it("still names the term", () => {
+      renderReadOnly("[Purpose](#purpose)");
+
+      expect(screen.getAllByText("Purpose").length).toBeGreaterThan(0);
+    });
+
+    it("still says what the term stands for", () => {
+      renderReadOnly("[Purpose](#purpose)");
+
+      // Twice: the visible tooltip, and the description read to assistive
+      // technology beside it.
+      expect(
+        screen.getAllByText(completeFields().purpose, { exact: false }).length,
+      ).toBeGreaterThan(0);
+    });
+
+    /** There is no cover page beside it to go and edit. */
+    it("does not offer to edit it", () => {
+      renderReadOnly("[Purpose](#purpose)");
+
+      expect(screen.queryByText(/Click to edit/)).toBeNull();
+    });
+  });
 });

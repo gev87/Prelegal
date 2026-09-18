@@ -40,3 +40,19 @@ def client(database_path: Path) -> Iterator[TestClient]:
 @pytest.fixture
 def credentials() -> dict[str, str]:
     return {"email": "dana@acme.com", "password": "correct-horse-battery"}
+
+
+@pytest.fixture
+def signed_in_client(
+    client: TestClient, credentials: dict[str, str]
+) -> Iterator[TestClient]:
+    """
+    A client that has signed up and is carrying the resulting session.
+
+    ``TestClient`` keeps a cookie jar, so the cookie ``/signup`` sets travels
+    on every later request by itself — which is precisely what a browser does,
+    and so what the guarded routes should be tested against.
+    """
+    response = client.post("/api/auth/signup", json=credentials)
+    assert response.status_code == 201, response.text
+    yield client
