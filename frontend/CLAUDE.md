@@ -63,7 +63,7 @@ Defined as tokens in `frontend/app/globals.css` (`--brand-*`); use those rather 
 
 ## Implementation status
 
-Current as of PL-6 (2026-09-14). PL-2 through PL-5 are on `main`.
+Current as of PL-6 (2026-09-18). PL-2 through PL-6 are all on `main`: PL-6 merged as PR #8 (`7fb0d38`), and there is no open branch ahead of it.
 
 ### Built
 
@@ -85,6 +85,13 @@ Current as of PL-6 (2026-09-14). PL-2 through PL-5 are on `main`.
 - Real authentication. The `users` table is the foundation a later ticket builds it on.
 - Streaming replies, rate limiting, and any conversation that survives a reload.
 
+### Built but never run
+
+Two gaps that have outlived three tickets, both worth closing before anything is demonstrated to anyone:
+
+- **The Docker image has never been built.** Unchanged since PL-4, and PL-6 added a `COPY` line to the frontend build stage so it can read `backend/app/document_fields.json`. The reasoning is sound and untested. Since `scripts/start-*` are what build the image, they have not run to completion either.
+- **No document has been drafted end to end through the browser** against a live `OPENROUTER_API_KEY`. PL-6's live checks called `llm.complete_structured` directly, which proves a real model can decode a `create_model`-built Structured Outputs schema but not that the chat panel, preview and downloads hold together around it.
+
 ### The one rule about the chat
 
 The model answers with the whole cover page **and** a list of what it changed, and `apply_updates` in `backend/app/document_schema.py` applies only the listed fields. Everything else it returns is discarded. Do not "simplify" that into trusting the returned object: it is what stops a model from quietly rewriting a field the user already settled in a document somebody signs.
@@ -93,7 +100,7 @@ PL-6 made that guarantee tighter rather than looser. The field-path enum is buil
 
 ### Working on this
 
-- Tests: `cd backend && uv run pytest` (228), `cd frontend && npm test` (311). `npm run verify` runs typecheck, lint, test and build.
+- Tests: `cd backend && uv run pytest` (233), `cd frontend && npm test` (320). `npm run verify` runs typecheck, lint, test and build.
 - `OPENROUTER_API_KEY` makes the assistant answer; see `.env.example`. Without it everything but the chat works, and the tests do not need it — the model is faked at two levels.
 - Native development runs the two halves separately — `next dev` on 3000, `uv run uvicorn app.main:app` on 8000 — and is the only case where CORS applies.
 - Editing a template needs an image rebuild, not a restart: they are baked in at build time. `backend/app/document_fields.json` is read by the frontend at build time *and* by the backend at startup, so editing it needs a rebuild too — and `backend/tests/test_document_types.py` checks it still describes the templates in both directions, so a template correction fails the suite rather than drifting quietly.
