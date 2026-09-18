@@ -3,9 +3,30 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import DocumentCreator from "@/components/DocumentCreator";
+import { DRAFT_DISCLAIMER, renderDocument } from "@/lib/documents/render";
 import { renderMnda } from "@/lib/nda/render";
 import { createDefaultFields, type NdaFields } from "@/lib/nda/schema";
-import { completeFields, DOCUMENTS, FAKE_STANDARD_TERMS } from "../fixtures/fields";
+import { guest, signedIn } from "../fixtures/account";
+import {
+  asDocumentFields,
+  completeFields,
+  DOCUMENTS,
+  FAKE_STANDARD_TERMS,
+  NDA_DOCUMENT,
+} from "../fixtures/fields";
+
+/** Built inline because `vi.hoisted` runs before imports — see
+ *  `test/fixtures/account.ts` for why the context is faked at all. */
+const account = vi.hoisted(() => ({
+  status: "guest" as "loading" | "guest" | "signed-in",
+  account: null as { id: number; email: string } | null,
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}));
+
+vi.mock("@/components/AccountProvider", () => ({
+  useAccount: () => account,
+}));
 
 const TODAY = "2026-03-14";
 
@@ -36,6 +57,10 @@ beforeEach(() => {
 
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
+
+  guest(account);
+  account.signIn.mockClear();
+  account.signOut.mockClear();
 });
 
 afterEach(() => {
@@ -277,9 +302,22 @@ describe("DocumentCreator", () => {
 
       await user.click(screen.getByRole("button", { name: "Download Markdown" }));
 
+      // `renderDocument` rather than `renderMnda`: the file is whatever the
+      // preview renders, which since PL-7 is the agreement plus the draft
+      // disclaimer appended around the branch. Comparing against the inner
+      // renderer would assert the file is missing it.
       expect(await createdBlobs[0].text()).toBe(
-        renderMnda(expectedFields(), FAKE_STANDARD_TERMS),
+        renderDocument(NDA_DOCUMENT, asDocumentFields(expectedFields())),
       );
+    });
+
+    it("puts the draft disclaimer in the downloaded file", async () => {
+      const { user } = renderCreator();
+      await answerEverything(user);
+
+      await user.click(screen.getByRole("button", { name: "Download Markdown" }));
+
+      expect(await createdBlobs[0].text()).toContain(DRAFT_DISCLAIMER);
     });
 
     it("leaves no dangling object URL behind", async () => {
@@ -436,5 +474,175 @@ describe("DocumentCreator", () => {
     expect(
       screen.getByRole("region", { name: "Agreement preview" }),
     ).toHaveTextContent(defaults.purpose);
+  });
+
+  /**
+   * Saving is the one thing an account buys. Everything else on this screen —
+   * drafting, the preview, both downloads — works exactly the same for a
+   * visitor who never signed in, which is what "guest mode is kept" means.
+   */
+  describe("keeping the document", () => {
+    function savedCalls() {
+      return fetchMock.mock.calls.filter(([path]) =>
+        String(path).includes("/api/documents"),
+      );
+    }
+
+    /** What the server answers a successful save with. Checked by
+     *  `lib/documents/history.ts` before it is trusted, so a stub of `{id: 1}`
+     *  is treated as a failed save — which is the point of that check. */
+    function savedDocument() {
+      return {
+        id: 1,
+        documentType: "mutual-nda",
+        documentTypeName: "Mutual NDA",
+        createdAt: "2026-03-14 12:00:00",
+        fields: expectedFields(),
+      };
+    }
+
+    describe("a visitor with no account", () => {
+      it("is not offered a Save button", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+      });
+
+      it("can still download", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        await user.click(screen.getByRole("button", { name: "Download Markdown" }));
+
+        expect(downloadedNames).toHaveLength(1);
+      });
+
+      /** Silently, and without being nagged about an account they declined. */
+      it("saves nothing when they do", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        await user.click(screen.getByRole("button", { name: "Download Markdown" }));
+
+        expect(savedCalls()).toHaveLength(0);
+      });
+    });
+
+    describe("somebody signed in", () => {
+      beforeEach(() => signedIn(account));
+
+      it("can save without downloading", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        fetchMock.mockResolvedValueOnce(jsonResponse(201, savedDocument()));
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => expect(savedCalls()).toHaveLength(1));
+      });
+
+      it("sends the document type and the cover page", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        fetchMock.mockResolvedValueOnce(jsonResponse(201, savedDocument()));
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() => expect(savedCalls()).toHaveLength(1));
+        expect(JSON.parse(savedCalls()[0][1].body)).toEqual({
+          documentType: "mutual-nda",
+          fields: expectedFields(),
+        });
+      });
+
+      /** Downloading is what "generated" means in the ticket's words, so a
+       *  document that leaves the building is one worth keeping. */
+      it("keeps a document that was downloaded as Markdown", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        fetchMock.mockResolvedValueOnce(jsonResponse(201, savedDocument()));
+        await user.click(screen.getByRole("button", { name: "Download Markdown" }));
+
+        await waitFor(() => expect(savedCalls()).toHaveLength(1));
+      });
+
+      it("keeps one that was printed to PDF", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        fetchMock.mockResolvedValueOnce(jsonResponse(201, savedDocument()));
+        await user.click(screen.getByRole("button", { name: "Download PDF" }));
+
+        await waitFor(() => expect(savedCalls()).toHaveLength(1));
+      });
+
+      it("says when it is saved", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        fetchMock.mockResolvedValueOnce(jsonResponse(201, savedDocument()));
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(await screen.findByRole("button", { name: "Saved" })).toBeInTheDocument();
+      });
+
+      /**
+       * The worst thing this screen could say. A save is still in flight when
+       * the assistant answers again; the reply is about the draft that has
+       * just been replaced. Reporting "Saved" then tells somebody their
+       * current legal document is stored when nothing has stored it.
+       */
+      it("does not report a finished save against a document that has moved on", async () => {
+        let finishTheSave: (response: Response) => void = () => {};
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        fetchMock.mockReturnValueOnce(
+          new Promise<Response>((resolve) => {
+            finishTheSave = resolve;
+          }),
+        );
+        await user.click(screen.getByRole("button", { name: "Save" }));
+        expect(await screen.findByRole("button", { name: "Saving…" })).toBeInTheDocument();
+
+        // The assistant answers again while the save is still going.
+        await answerEverything(user);
+        expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+
+        finishTheSave(jsonResponse(201, savedDocument()));
+
+        // Still an offer, not a promise: the document on screen is not the one
+        // that was saved.
+        await waitFor(() =>
+          expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument(),
+        );
+        expect(screen.queryByRole("button", { name: "Saved" })).toBeNull();
+      });
+
+      it("says when it could not be", async () => {
+        const { user } = renderCreator();
+        await answerEverything(user);
+
+        fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(await screen.findByRole("alert")).toHaveTextContent(/Could not save/);
+      });
+
+      /**
+       * Through the same gate the downloads use, so a half-answered document
+       * is refused in the assistant's words rather than stored as something to
+       * look back at.
+       */
+      it("refuses to keep an unfinished document", async () => {
+        const { user } = renderCreator();
+
+        await user.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(savedCalls()).toHaveLength(0);
+      });
+    });
   });
 });

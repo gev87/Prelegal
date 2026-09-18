@@ -1,12 +1,18 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   Prelegal — Mutual NDA creator
+   Prelegal
 
    The tool recedes and the document is the artifact: dark drafting chrome
    holds the controls, while the agreement itself sits on a true white sheet
-   set in a reading serif. Brass is reserved for one job — marking the defined
-   terms that connect the cover page to the standard terms.
+   set in a reading serif.
+
+   One palette, since PL-7. The chrome tokens below describe structure; the
+   brand's five colours, documented in CLAUDE.md, are named for the job each
+   one does rather than for the colour it is — so a rule asks for `--primary`
+   or `--link` and the palette can be retuned in one place. The login screen
+   used to carry the brand colours alone while the creator ran on its own
+   brass accent, which made two screens of one product look like two products.
    ========================================================================== */
 
 :root {
@@ -24,11 +30,38 @@
   --ink-muted: #545e6c;
   --paper-rule: #e1e5ea;
 
-  --brass: #b8823a;
-  --brass-on-dark: #dba85d;
-  --brass-soft: rgba(184, 130, 58, 0.14);
+  /* The brand, by the job each colour does. Hexes per CLAUDE.md. */
+
+  /* Anything to be acted on: the primary button, the submit. White on it
+     rather than near-black — the purple is dark enough that the reverse is
+     unreadable. */
+  --primary: #753991;
+  --primary-strong: #632f7c;
+  --primary-text: #ffffff;
+
+  /* Anything to be followed or focused: links, the focus ring. */
+  --link: #209dd7;
+
+  /* Anything to be noticed but not acted on: defined-term markers, the
+     assistant's name, the no-key notice. */
+  --accent: #ecad0a;
+  --accent-soft: rgba(236, 173, 10, 0.14);
+
+  /* Headings on a light surface — the document's clause labels, the login and
+     history cards. Reads as legal rather than decorative. */
+  --heading: #032147;
+  --faint: #888888;
+
+  /* A light page *behind* a light card, as distinct from --paper, which is
+     the card and the document sheet themselves. */
+  --paper-tint: #f4f6f9;
+  --paper-tint-rule: #d9dfe7;
 
   --danger: #e8746f;
+  --danger-soft: rgba(232, 116, 111, 0.12);
+  /* The same failure on a light surface, where the on-dark red is unreadable. */
+  --danger-paper: #c2413c;
+  --danger-paper-text: #8f2f2b;
 
   --radius: 7px;
 }
@@ -42,7 +75,14 @@ body {
   height: 100%;
 }
 
+/* A column of shell-then-screen. `.app` and the other screens below claim the
+   remaining height with `flex: 1; min-height: 0` rather than `height: 100%`,
+   which would now mean "the whole viewport, below a bar that also takes some"
+   and push the page off the bottom. The `min-height: 0` is what lets the chat
+   transcript scroll inside its pane instead of stretching the page. */
 body {
+  display: flex;
+  flex-direction: column;
   margin: 0;
   background: var(--chrome-900);
   color: var(--chrome-text);
@@ -50,8 +90,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.shell-body {
+  flex: 1;
+  min-height: 0;
+}
+
 :focus-visible {
-  outline: 2px solid var(--brass-on-dark);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
   border-radius: 3px;
 }
@@ -64,6 +109,90 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+}
+
+/* ==========================================================================
+   The bar across every screen
+
+   One header for the whole product, rather than each screen drawing its own —
+   which is how the creator and the login screen came to look unrelated. It
+   carries `.no-print`, because a PDF is produced by printing the page and a
+   site nav across the top of a signed agreement would be absurd.
+   ========================================================================== */
+
+.shell {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1.5rem;
+  background: var(--chrome-900);
+  border-bottom: 1px solid var(--rule);
+}
+
+.shell-brand {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--chrome-text);
+  text-decoration: none;
+}
+
+.shell-nav {
+  display: flex;
+  gap: 1.1rem;
+}
+
+.shell-nav-link {
+  padding: 0.15rem 0;
+  border-bottom: 2px solid transparent;
+  font-size: 0.83rem;
+  color: var(--chrome-muted);
+  text-decoration: none;
+}
+
+.shell-nav-link:hover {
+  color: var(--chrome-text);
+}
+
+.shell-nav-link-active {
+  border-bottom-color: var(--accent);
+  color: var(--chrome-text);
+}
+
+/* Pushed to the far end, and holding its place while the account is still
+   being worked out so the bar does not jump once it arrives. */
+.shell-account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+  min-height: 1.6rem;
+  font-size: 0.8rem;
+}
+
+.shell-account-email {
+  color: var(--chrome-muted);
+}
+
+.shell-signout {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  cursor: pointer;
+}
+
+.shell-signin {
+  color: var(--link);
+  text-decoration: none;
+}
+
+.shell-signout:hover,
+.shell-signin:hover {
+  text-decoration: underline;
 }
 
 .app-header {
@@ -154,22 +283,49 @@ body {
   border-color: var(--chrome-600);
 }
 
+/* A link that looks like a button is still a link, and the browser would
+   underline it. */
+a.button {
+  text-decoration: none;
+}
+
 .button-primary {
-  background: var(--brass);
-  border-color: var(--brass);
-  color: #14100a;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
   font-weight: 600;
 }
 
 .button-primary:hover {
-  background: var(--brass-on-dark);
-  border-color: var(--brass-on-dark);
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
 }
 
+.download-disclaimer {
+  margin: 0.4rem 0 0;
+  max-width: 34rem;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: var(--chrome-faint);
+}
+
+.download-save-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  color: var(--danger);
+}
+
+.download-bar-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* A column now, not a row: the buttons sit above the standing disclaimer that
+   PL-7 put beside them. */
 .download-bar {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 /* ==========================================================================
@@ -229,7 +385,7 @@ body {
 }
 
 .chat-message-assistant .chat-who {
-  color: var(--brass-on-dark);
+  color: var(--accent);
 }
 
 .chat-thinking {
@@ -298,9 +454,9 @@ body {
 .chat-notice {
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--rule);
-  border-left: 2px solid var(--brass);
+  border-left: 2px solid var(--accent);
   border-radius: var(--radius);
-  background: var(--brass-soft);
+  background: var(--accent-soft);
   color: var(--chrome-muted);
 }
 
@@ -358,7 +514,7 @@ body {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  color: var(--brass);
+  color: var(--heading);
 }
 
 .document h3 {
@@ -410,7 +566,28 @@ body {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.72rem;
   font-weight: 500;
-  color: var(--brass);
+  color: var(--heading);
+}
+
+.document blockquote {
+  margin: 2.5rem 0 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--paper-rule);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-family: var(--font-ui), ui-sans-serif, sans-serif;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
+.document blockquote p {
+  margin: 0;
+}
+
+.document blockquote strong {
+  color: var(--ink);
 }
 
 .document table {
@@ -479,7 +656,7 @@ body {
 .term-ref {
   padding: 0;
   border: 0;
-  border-bottom: 1px dashed var(--brass);
+  border-bottom: 1px dashed var(--link);
   background: none;
   color: inherit;
   font: inherit;
@@ -488,7 +665,19 @@ body {
 }
 
 .term-ref:hover {
-  background: var(--brass-soft);
+  background: rgba(32, 157, 215, 0.12);
+}
+
+/* The saved-document viewer, where a term explains itself on hover but cannot
+   be edited — so it is not styled as something that can be. */
+.term-ref-static {
+  border-bottom-style: dotted;
+  border-bottom-color: var(--ink-muted);
+  cursor: default;
+}
+
+.term-ref-static:hover {
+  background: none;
 }
 
 .term-tip {
@@ -522,7 +711,7 @@ body {
   font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.11em;
-  color: var(--brass-on-dark);
+  color: var(--accent);
 }
 
 .term-tip-value {
@@ -627,6 +816,7 @@ body {
      document. */
   .app,
   .panes,
+  .panes-single,
   .pane-document {
     display: block;
     height: auto;
@@ -642,6 +832,16 @@ body {
   .view-switch,
   .no-print {
     display: none;
+  }
+
+  /* The saved-document viewer prints through the same rules as the creator,
+     so its wrappers have to unwrap the same way. */
+  .shell-body,
+  .viewer {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
   .sheet {
@@ -688,32 +888,161 @@ body {
 }
 
 /* ==========================================================================
-   Login
+   My documents
 
-   The one screen on the Prelegal brand palette rather than the drafting
-   chrome: navy headings, a purple submit, blue for the ways out. The creator
-   keeps its own dark palette — these tokens and the .login-* rules below are
-   additive, and nothing above this comment reads them.
+   A light page, like the login screen and for the same reason: these are the
+   administrative parts of the product, not the drafting surface, and the dark
+   chrome is reserved for the screen where a document is being written.
    ========================================================================== */
 
-:root {
-  --brand-navy: #032147;
-  --brand-blue: #209dd7;
-  --brand-purple: #753991;
-  --brand-yellow: #ecad0a;
-  --brand-gray: #888888;
-
-  --brand-paper: #f4f6f9;
-  --brand-rule: #d9dfe7;
+.history-page {
+  min-height: 100%;
+  padding: 3rem 1.25rem 4rem;
+  background: var(--paper-tint);
 }
+
+.history {
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.history-heading {
+  margin: 0 0 1.5rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--heading);
+}
+
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.history-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--paper-tint-rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.history-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.history-card-type {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--heading);
+}
+
+.history-card-date {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--faint);
+}
+
+/* A plain button on paper, where the chrome-tinted .button would disappear.
+   Deliberately not applied to the empty states, whose only button is a
+   .button-primary — overriding that here would have to be undone immediately
+   afterwards, and the undoing is what silently cancelled its hover. */
+.history-card .button,
+.history-error .button {
+  background: var(--paper);
+  border: 1px solid var(--paper-tint-rule);
+  color: var(--heading);
+}
+
+.history-card .button:hover,
+.history-error .button:hover {
+  background: var(--paper-tint);
+  border-color: var(--link);
+}
+
+.history-empty,
+.history-loading,
+.history-error {
+  padding: 2rem 1.5rem;
+  border: 1px solid var(--paper-tint-rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink-muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.history-empty p,
+.history-error p {
+  margin: 0 0 1.1rem;
+}
+
+.history-error {
+  border-left: 3px solid var(--danger-paper);
+  color: var(--danger-paper-text);
+  text-align: left;
+}
+
+/* ==========================================================================
+   A saved document, read back
+
+   Reuses .app-header, .panes, .pane-document and .sheet from the creator, so
+   the print stylesheet reduces this page to the agreement exactly as it does
+   there, with no rule of its own.
+   ========================================================================== */
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.panes-single {
+  grid-template-columns: 1fr;
+}
+
+.viewer-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 0.83rem;
+  cursor: pointer;
+}
+
+.viewer-back:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Login
+
+   A light card on a tinted page, and since PL-7 on the same tokens as
+   everything else — the brand colours it used to own alone are now the whole
+   product's, so this screen and the creator no longer read as two products.
+   ========================================================================== */
 
 .login {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100%;
-  padding: 2rem 1.25rem;
-  background: var(--brand-paper);
+  padding: 3rem 1.25rem;
+  background: var(--paper-tint);
 }
 
 .login-card {
@@ -721,14 +1050,14 @@ body {
   max-width: 25rem;
   padding: 2.25rem;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--paper);
   box-shadow: 0 14px 40px rgba(3, 33, 71, 0.1);
-  border-top: 3px solid var(--brand-yellow);
+  border-top: 3px solid var(--accent);
 }
 
 .login-brand {
   margin: 0;
-  color: var(--brand-blue);
+  color: var(--link);
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.72rem;
   font-weight: 500;
@@ -738,7 +1067,7 @@ body {
 
 .login-heading {
   margin: 0.4rem 0 1.6rem;
-  color: var(--brand-navy);
+  color: var(--heading);
   font-size: 1.4rem;
   line-height: 1.25;
 }
@@ -750,7 +1079,7 @@ body {
 .login-label {
   display: block;
   margin-bottom: 0.3rem;
-  color: var(--brand-navy);
+  color: var(--heading);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -758,23 +1087,23 @@ body {
 .login-input {
   width: 100%;
   padding: 0.55rem 0.7rem;
-  border: 1px solid var(--brand-rule);
+  border: 1px solid var(--paper-tint-rule);
   border-radius: var(--radius);
-  background: #ffffff;
-  color: var(--brand-navy);
+  background: var(--paper);
+  color: var(--heading);
   font: inherit;
   font-size: 0.92rem;
 }
 
 .login-input:focus-visible {
-  outline: 2px solid var(--brand-blue);
+  outline: 2px solid var(--link);
   outline-offset: 1px;
-  border-color: var(--brand-blue);
+  border-color: var(--link);
 }
 
 .login-hint {
   margin: 0.3rem 0 0;
-  color: var(--brand-gray);
+  color: var(--faint);
   font-size: 0.75rem;
 }
 
@@ -782,9 +1111,9 @@ body {
   margin: 0 0 1.1rem;
   padding: 0.6rem 0.75rem;
   border-radius: var(--radius);
-  border-left: 3px solid #c2413c;
+  border-left: 3px solid var(--danger-paper);
   background: rgba(194, 65, 60, 0.08);
-  color: #8f2f2b;
+  color: var(--danger-paper-text);
   font-size: 0.84rem;
 }
 
@@ -794,8 +1123,8 @@ body {
   padding: 0.65rem;
   border: 0;
   border-radius: var(--radius);
-  background: var(--brand-purple);
-  color: #ffffff;
+  background: var(--primary);
+  color: var(--primary-text);
   font: inherit;
   font-size: 0.92rem;
   font-weight: 600;
@@ -803,7 +1132,7 @@ body {
 }
 
 .login-submit:hover:not(:disabled) {
-  background: #632f7c;
+  background: var(--primary-strong);
 }
 
 .login-submit:disabled {
@@ -819,7 +1148,7 @@ body {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--brand-blue);
+  color: var(--link);
   font: inherit;
   font-size: 0.84rem;
   text-align: center;
@@ -829,17 +1158,17 @@ body {
 .login-skip {
   margin: 0.9rem 0 0;
   padding-top: 0.9rem;
-  border-top: 1px solid var(--brand-rule);
+  border-top: 1px solid var(--paper-tint-rule);
 }
 
 .login-skip a {
   margin-top: 0;
-  color: var(--brand-gray);
+  color: var(--faint);
   text-decoration: underline;
 }
 
 .login-skip a:hover {
-  color: var(--brand-navy);
+  color: var(--heading);
 }
 
 /* The creator is withheld until the visitor's date is known — one frame,

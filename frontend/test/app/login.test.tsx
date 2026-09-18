@@ -6,6 +6,19 @@ import LoginPage from "@/app/login/page";
 
 const push = vi.fn();
 
+/** Built inline because `vi.hoisted` runs before imports — see
+ *  `test/fixtures/account.ts`. */
+const account = vi.hoisted(() => ({
+  status: "guest" as "loading" | "guest" | "signed-in",
+  account: null as { id: number; email: string } | null,
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}));
+
+vi.mock("@/components/AccountProvider", () => ({
+  useAccount: () => account,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
@@ -21,6 +34,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   push.mockClear();
+  account.signIn.mockClear();
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
 });

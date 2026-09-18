@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { asList, describePaths, labelForPath } from "@/lib/documents/labels";
 import {
   documentFilename,
+  DRAFT_DISCLAIMER,
+  DRAFT_DISCLAIMER_LINE,
   renderDocument,
   transformStandardTerms,
 } from "@/lib/documents/render";
@@ -265,5 +267,44 @@ describe("the catalog as the app sees it", () => {
   it("recognises the one hand-written type", () => {
     expect(isMutualNda(NDA_DOCUMENT.slug)).toBe(true);
     expect(isMutualNda(PILOT_DOCUMENT.slug)).toBe(false);
+  });
+});
+
+/**
+ * The disclaimer has to reach three surfaces that are easy to let drift apart:
+ * the preview, the Markdown file and the PDF. All three are the string
+ * `renderDocument` returns, so these two cases are what keep the promise —
+ * and they cover both code paths, because the NDA is rendered by an entirely
+ * different function from the other ten.
+ */
+describe("the draft disclaimer", () => {
+  it("is on the Mutual NDA", () => {
+    const markdown = renderDocument(NDA_DOCUMENT, asDocumentFields(completeFields()));
+
+    expect(markdown).toContain(DRAFT_DISCLAIMER);
+  });
+
+  it("is on a catalogued document type too", () => {
+    const markdown = renderDocument(PILOT_DOCUMENT, completePilotFields());
+
+    expect(markdown).toContain(DRAFT_DISCLAIMER);
+  });
+
+  it("is quoted, so it reads as a note about the document", () => {
+    const markdown = renderDocument(PILOT_DOCUMENT, completePilotFields());
+
+    expect(markdown).toContain(`> ${DRAFT_DISCLAIMER}`);
+  });
+
+  it("comes after the agreement rather than before it", () => {
+    const markdown = renderDocument(PILOT_DOCUMENT, completePilotFields());
+
+    expect(markdown.indexOf(DRAFT_DISCLAIMER)).toBeGreaterThan(markdown.indexOf("#"));
+  });
+
+  /** The chrome cannot show Markdown asterisks, and the two must not be
+   *  allowed to drift into saying different things. */
+  it("says the same thing in the app as in the document", () => {
+    expect(DRAFT_DISCLAIMER.replace(/\*\*/g, "")).toBe(DRAFT_DISCLAIMER_LINE);
   });
 });

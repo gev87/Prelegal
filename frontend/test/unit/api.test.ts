@@ -66,3 +66,53 @@ describe("apiUrl", () => {
     expect(apiUrl("/api/auth/signin")).toBe("https://api.example.com/api/auth/signin");
   });
 });
+
+describe("apiFetch", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue({ ok: true } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  /**
+   * The reason this wrapper exists at all. The session cookie is HttpOnly, so
+   * only the browser can send it, and cross-origin it will not without this.
+   * A call that forgets it works perfectly in the container — one origin — and
+   * silently signs the developer out under `next dev`, which is the worst way
+   * round for a bug to behave.
+   */
+  it("sends credentials on every call", async () => {
+    const { apiFetch } = await import("@/lib/api");
+
+    await apiFetch("/api/auth/me");
+
+    expect(fetchMock.mock.calls[0][1].credentials).toBe("include");
+  });
+
+  it("asks for JSON so FastAPI parses the body", async () => {
+    const { apiFetch } = await import("@/lib/api");
+
+    await apiFetch("/api/documents", { method: "POST", body: "{}" });
+
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+      "Content-Type": "application/json",
+    });
+  });
+
+  it("lets a caller override the headers it sets", async () => {
+    const { apiFetch } = await import("@/lib/api");
+
+    await apiFetch("/api/documents", { headers: { "Content-Type": "text/plain" } });
+
+    expect(fetchMock.mock.calls[0][1].headers["Content-Type"]).toBe("text/plain");
+  });
+
+  it("resolves the path the same way apiUrl does", async () => {
+    const { apiFetch, apiUrl } = await import("@/lib/api");
+
+    await apiFetch("/api/chat");
+
+    expect(fetchMock.mock.calls[0][0]).toBe(apiUrl("/api/chat"));
+  });
+});

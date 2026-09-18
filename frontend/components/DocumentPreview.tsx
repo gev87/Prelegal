@@ -26,7 +26,16 @@ interface DocumentPreviewProps {
    * just is not a control.
    */
   ndaFields: NdaFields | null;
-  onTermSelect: (key: DefinedTermKey) => void;
+  /**
+   * What to do when a defined term is activated, on the screen where there is
+   * something to do — the creator, which routes it to the assistant.
+   *
+   * Absent on the saved-document viewer, which has no conversation to send an
+   * edit to. A term then still shows what it stands for on hover, but is text
+   * rather than a control: offering a button that cannot change anything is
+   * worse than offering none.
+   */
+  onTermSelect?: (key: DefinedTermKey) => void;
 }
 
 export default function DocumentPreview({
@@ -82,32 +91,43 @@ export default function DocumentPreview({
 interface DefinedTermRefProps {
   term: DefinedTerm;
   value: string;
-  onSelect: (key: DefinedTermKey) => void;
+  onSelect?: (key: DefinedTermKey) => void;
 }
 
 function DefinedTermRef({ term, value, onSelect }: DefinedTermRefProps) {
   const tipId = useId();
+  const shown = value || "Not filled in yet";
 
-  const description = `${term.label}: ${value || "not filled in yet"}. Activate to edit it on the cover page.`;
+  const description = onSelect
+    ? `${term.label}: ${shown}. Activate to edit it on the cover page.`
+    : `${term.label}: ${shown}.`;
 
   return (
     <span className="term">
-      <button
-        type="button"
-        className="term-ref"
-        aria-describedby={tipId}
-        onClick={() => onSelect(term.key)}
-      >
-        {term.label}
-      </button>
+      {onSelect ? (
+        <button
+          type="button"
+          className="term-ref"
+          aria-describedby={tipId}
+          onClick={() => onSelect(term.key)}
+        >
+          {term.label}
+        </button>
+      ) : (
+        <span className="term-ref term-ref-static" aria-describedby={tipId}>
+          {term.label}
+        </span>
+      )}
 
       {/* The visible tooltip is hidden from assistive tech, which reads the
           always-present description below instead — a `visibility: hidden`
           element is not reliably reachable through aria-describedby. */}
       <span className="term-tip" aria-hidden="true">
         <span className="term-tip-label">{term.label}</span>
-        <span className="term-tip-value">{value || "Not filled in yet"}</span>
-        <span className="term-tip-hint">Click to edit this on the cover page</span>
+        <span className="term-tip-value">{shown}</span>
+        {onSelect ? (
+          <span className="term-tip-hint">Click to edit this on the cover page</span>
+        ) : null}
       </span>
       <span className="visually-hidden" id={tipId}>
         {description}

@@ -2,9 +2,10 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { useAccount } from "@/components/AccountProvider";
 import ChatPanel, { type ChatPanelHandle } from "@/components/ChatPanel";
 import DocumentPreview from "@/components/DocumentPreview";
-import DownloadBar from "@/components/DownloadBar";
+import DownloadBar, { type SaveState } from "@/components/DownloadBar";
 import type { ChatTurn } from "@/lib/chat";
 import {
   findDocument,
@@ -13,7 +14,9 @@ import {
   type DocumentFields,
   type DocumentType,
 } from "@/lib/documents/types";
-import { documentFilename, renderDocument } from "@/lib/documents/render";
+import { downloadMarkdown, downloadPdf } from "@/lib/documents/download";
+import { saveDocument } from "@/lib/documents/history";
+import { renderDocument } from "@/lib/documents/render";
 import { describeMissing, validateDocument } from "@/lib/documents/validate";
 import type { DefinedTermKey, NdaFields } from "@/lib/nda/schema";
 
@@ -38,7 +41,9 @@ export default function DocumentCreator({ documents, today }: DocumentCreatorPro
   const [documentType, setDocumentType] = useState(UNDETERMINED);
   const [fields, setFields] = useState<DocumentFields>({});
   const [mobileView, setMobileView] = useState<MobileView>("chat");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const chat = useRef<ChatPanelHandle>(null);
+  const { status } = useAccount();
 
   const active = useMemo(
     () => findDocument(documents, documentType),
@@ -63,9 +68,23 @@ export default function DocumentCreator({ documents, today }: DocumentCreatorPro
    * be read with the wrong labels, and for a moment the preview would be
    * nonsense.
    */
+  /**
+   * Which version of the document is on screen.
+   *
+   * Bumped by every turn, and read by `keep` below so that a save which was
+   * still in flight when the document changed cannot report back about it.
+   * Without this, "Saved" could appear over a draft that was never saved —
+   * the worst possible lie to tell somebody about a legal document.
+   */
+  const version = useRef(0);
+
   const handleTurn = useCallback((turn: ChatTurn) => {
+    version.current += 1;
     setDocumentType(turn.documentType);
     setFields(turn.fields);
+    // The document has moved on, so "Saved" is no longer true of what is on
+    // screen. Back to an offer rather than a statement.
+    setSaveState("idle");
   }, []);
 
   /**
@@ -110,37 +129,61 @@ export default function DocumentCreator({ documents, today }: DocumentCreatorPro
     [active, errors],
   );
 
-  const downloadMarkdown = useCallback(() => {
+  /**
+   * Keep the document, if there is anybody to keep it for.
+   *
+   * Silent for a guest rather than nagging: they were told what an account is
+   * for on the way in, and a visitor who chose to draft without one has not
+   * asked to be reminded every time they download something.
+   */
+  const keep = useCallback(async () => {
+    if (!active || status !== "signed-in") return;
+
+    const saving = version.current;
+    setSaveState("saving");
+
+    try {
+      await saveDocument(active.slug, fields);
+      // The document that was saved is still the one on screen. If the
+      // assistant has answered since, this result is about a draft the visitor
+      // has already moved past, and saying "Saved" now would be saying it
+      // about the wrong document.
+      if (saving === version.current) setSaveState("saved");
+    } catch {
+      if (saving === version.current) setSaveState("error");
+    }
+  }, [active, fields, status]);
+
+  const handleDownloadMarkdown = useCallback(() => {
     withCompleteDocument(() => {
       if (!active) return;
-
-      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      link.href = url;
-      link.download = documentFilename(active, fields, "md");
-      document.body.append(link);
-      link.click();
-      link.remove();
-
-      // Revoking in the same tick can cancel the download in some browsers.
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      downloadMarkdown(active, fields, markdown);
+      void keep();
     });
-  }, [active, fields, markdown, withCompleteDocument]);
+  }, [active, fields, keep, markdown, withCompleteDocument]);
 
-  const downloadPdf = useCallback(() => {
-    // The print stylesheet reduces the page to the sheet alone; the browser's
-    // "Save as PDF" destination produces real, selectable text rather than the
-    // bitmap a canvas-based exporter would give.
-    withCompleteDocument(() => window.print());
-  }, [withCompleteDocument]);
+  const handleDownloadPdf = useCallback(() => {
+    withCompleteDocument(() => {
+      downloadPdf();
+      void keep();
+    });
+  }, [keep, withCompleteDocument]);
+
+  /**
+   * The explicit Save, which goes through the same completeness gate the
+   * downloads do — so a half-answered document is refused in the assistant's
+   * words rather than stored as something to look back at.
+   */
+  const handleSave = useCallback(() => {
+    withCompleteDocument(() => void keep());
+  }, [keep, withCompleteDocument]);
 
   return (
     <div className="app">
       <header className="app-header">
+        {/* The wordmark moved to the shell in PL-7; what stays here is the
+            document being drafted, which is this screen's own business. */}
         <div className="brand">
-          <h1 className="brand-name">Prelegal</h1>
           <span className="brand-doc">
             {active ? active.name : "Choose a document"}
           </span>
@@ -162,8 +205,10 @@ export default function DocumentCreator({ documents, today }: DocumentCreatorPro
         </div>
 
         <DownloadBar
-          onDownloadMarkdown={downloadMarkdown}
-          onDownloadPdf={downloadPdf}
+          onDownloadMarkdown={handleDownloadMarkdown}
+          onDownloadPdf={handleDownloadPdf}
+          onSave={status === "signed-in" ? handleSave : undefined}
+          saveState={saveState}
         />
       </header>
 

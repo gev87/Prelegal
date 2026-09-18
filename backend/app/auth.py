@@ -1,15 +1,16 @@
 """
-Sign up and sign in.
+Sign up, sign in, sign out, and who is asking.
 
-Real endpoints against a real table, and deliberately *not* a gate. PL-4
-asks for a login screen, not for authentication: these routes create and
-check accounts, but they issue no session and no token, and no other route
-consults them. The frontend can always walk past the screen without calling
-either one.
+PL-4 built these routes as deliberately *not* a gate: real accounts in a real
+table, but no session, no token, and nothing consulting them. PL-7 issues the
+session. Signing up or signing in now sets a cookie, and ``current_account``
+turns that cookie back into an account for the routes that need one.
 
-That makes this the honest shape of the foundation — the account handling a
-later ticket needs is here and tested, while nothing pretends to be
-protected in the meantime.
+What did *not* change is who is allowed in. Drafting a document, talking to
+the assistant and downloading the result still require no account at all —
+PL-7 gates exactly one thing, the saved documents in ``app.documents``, on the
+grounds that a list of what *you* drafted has no meaning without a you. A
+visitor who never signs in sees the product behave exactly as it did before.
 """
 
 from __future__ import annotations
@@ -17,15 +18,28 @@ from __future__ import annotations
 import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr, Field
 
 from app.db import get_connection
-from app.security import hash_password, verify_password
+from app.security import (
+    SESSION_COOKIE_NAME,
+    SESSION_MAX_AGE_SECONDS,
+    hash_password,
+    sign_session,
+    verify_password,
+    verify_session,
+)
 
 router = APIRouter(tags=["auth"])
 
 Connection = Annotated[sqlite3.Connection, Depends(get_connection)]
+
+#: The session cookie, or ``None`` from a browser that has never signed in.
+#: Optional at this level on purpose — "no cookie" is answered by
+#: ``current_account`` with the same 401 as a cookie that does not verify,
+#: rather than by FastAPI with a 422 about a missing parameter.
+SessionCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)]
 
 
 class Credentials(BaseModel):
@@ -46,7 +60,9 @@ class Account(BaseModel):
 
 
 @router.post("/signup", response_model=Account, status_code=status.HTTP_201_CREATED)
-def sign_up(credentials: Credentials, connection: Connection) -> Account:
+def sign_up(
+    credentials: Credentials, connection: Connection, response: Response
+) -> Account:
     email = _normalise(credentials.email)
 
     try:
@@ -64,11 +80,15 @@ def sign_up(credentials: Credentials, connection: Connection) -> Account:
             detail="An account with that email already exists.",
         ) from None
 
-    return Account(id=cursor.lastrowid or 0, email=email)
+    account = Account(id=cursor.lastrowid or 0, email=email)
+    _issue_session(response, account.id)
+    return account
 
 
 @router.post("/signin", response_model=Account)
-def sign_in(credentials: Credentials, connection: Connection) -> Account:
+def sign_in(
+    credentials: Credentials, connection: Connection, response: Response
+) -> Account:
     email = _normalise(credentials.email)
     row = connection.execute(
         "SELECT id, email, password_hash FROM users WHERE email = ?", (email,)
@@ -82,7 +102,87 @@ def sign_in(credentials: Credentials, connection: Connection) -> Account:
             detail="That email and password do not match an account.",
         )
 
-    return Account(id=row["id"], email=row["email"])
+    account = Account(id=row["id"], email=row["email"])
+    _issue_session(response, account.id)
+    return account
+
+
+@router.post("/signout", status_code=status.HTTP_204_NO_CONTENT)
+def sign_out(response: Response) -> None:
+    """
+    Put the cookie out, whether or not there was one.
+
+    Deliberately unguarded. Signing out while already signed out is what a
+    second click on the button does, and answering it with a 401 would be
+    telling somebody off for reaching the state they asked for.
+    """
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+
+
+def current_account(connection: Connection, session: SessionCookie = None) -> Account:
+    """
+    The account behind the request, or a 401.
+
+    A dependency rather than a check inside each handler, so that a route is
+    protected by its signature — ``account: RequireAccount`` — and cannot be
+    added later without one.
+
+    Every way of not being signed in gives the same answer: no cookie, a
+    cookie this process can no longer verify, and a cookie naming a row that
+    ``init_db`` has since deleted are one situation to the visitor, who needs
+    to sign in again in all three cases.
+    """
+    account_id = verify_session(session)
+
+    if account_id is not None:
+        row = connection.execute(
+            "SELECT id, email FROM users WHERE id = ?", (account_id,)
+        ).fetchone()
+
+        if row is not None:
+            return Account(id=row["id"], email=row["email"])
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sign in to see documents you have saved.",
+    )
+
+
+RequireAccount = Annotated[Account, Depends(current_account)]
+
+
+@router.get("/me", response_model=Account)
+def me(account: RequireAccount) -> Account:
+    """
+    Who the browser is signed in as.
+
+    The session cookie is ``HttpOnly``, so the page cannot read it and work
+    this out for itself. Asking is the only way, which makes this the frontend's
+    single source of truth for whether to show an email or a "Sign in" link.
+    """
+    return account
+
+
+def _issue_session(response: Response, account_id: int) -> None:
+    """
+    Sign the account into the cookie the browser will send back.
+
+    ``samesite="lax"`` rather than ``"strict"``: the cookie should survive a
+    visitor following a link into the product, which is how anyone arrives.
+
+    ``secure`` is deliberately not set. Nothing in front of this app terminates
+    TLS today — the container serves plain HTTP on 8000 — so requiring a secure
+    channel would stop sessions working entirely rather than harden them. It
+    belongs with the reverse proxy that first puts this on a real domain.
+    """
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        sign_session(account_id),
+        max_age=SESSION_MAX_AGE_SECONDS,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
 
 
 def _normalise(email: str) -> str:

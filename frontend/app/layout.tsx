@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Archivo, IBM_Plex_Mono, Newsreader } from "next/font/google";
+
+import AccountProvider from "@/components/AccountProvider";
+import AppShell from "@/components/AppShell";
+
 import "./globals.css";
 
 /** The interface. */
@@ -24,19 +28,31 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+/** Eleven document types since PL-6, not one — this said "Mutual NDA creator"
+ *  for two tickets after that stopped being true. */
 export const metadata: Metadata = {
-  title: "Mutual NDA creator · Prelegal",
+  title: "Prelegal · draft a legal agreement",
   description:
-    "Fill in a few details and get a complete, signable Common Paper Mutual NDA.",
+    "Describe the agreement you need and get a complete, signable Common Paper document.",
 };
 
+/**
+ * The shell wraps every route, so the nav and the account are drawn once
+ * rather than per screen, and `AccountProvider` sits outside it so the shell
+ * and the page below it can never disagree about who is signed in.
+ */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${archivo.variable} ${newsreader.variable} ${plexMono.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <AccountProvider>
+          <AppShell />
+          <div className="shell-body">{children}</div>
+        </AccountProvider>
+      </body>
     </html>
   );
 }

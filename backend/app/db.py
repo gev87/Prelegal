@@ -1,5 +1,5 @@
 """
-The users database.
+The users and saved-documents database.
 
 Deliberately a real file on disk and deliberately single-writer. Both of
 those are load-bearing, and both are easy to "simplify" into a bug:
@@ -12,7 +12,22 @@ database that request opened.
 More than one worker process would split the file's writers across
 processes that cannot see each other's uncommitted state. ``uvicorn`` is
 started without ``--workers`` for exactly this reason; adding it later means
-moving off a single SQLite file first.
+moving off a single SQLite file first. Sessions inherit that constraint as of
+PL-7: two workers would each hold their own signing secret and so reject each
+other's cookies, for the same reason they cannot see each other's rows.
+
+A saved document is the same two values the browser already holds while
+drafting — the document type and the cover page — stored as a slug and a JSON
+blob. Not the conversation that produced them: PL-7 asks that a visitor be
+able to look back at a document, not resume drafting it, and the transcript is
+worth nothing to a reader of a finished agreement.
+
+``documents.user_id`` names ``users(id)`` as documentation. SQLite does not
+enforce a foreign key unless ``PRAGMA foreign_keys=ON``, which nothing here
+sets, so the constraint is a note to the next reader rather than a guarantee.
+What actually keeps a row attached to the right person is that ``user_id``
+only ever comes from ``app.auth.current_account`` — an account the request
+just proved it holds a valid session for.
 """
 
 from __future__ import annotations
@@ -31,7 +46,17 @@ CREATE TABLE users (
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-)
+);
+
+CREATE TABLE documents (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL REFERENCES users(id),
+    document_type TEXT NOT NULL,
+    fields_json   TEXT NOT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX documents_user_id_idx ON documents(user_id);
 """
 
 

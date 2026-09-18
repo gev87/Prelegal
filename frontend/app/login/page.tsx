@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, type FormEvent } from "react";
 
-import { apiUrl, describeFailure } from "@/lib/api";
+import { useAccount } from "@/components/AccountProvider";
+import { apiFetch, describeFailure } from "@/lib/api";
 
 type Mode = "signin" | "signup";
 
@@ -24,19 +25,21 @@ const COPY: Record<Mode, { heading: string; submit: string; alternate: string }>
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
- * The login screen — and deliberately not a gate.
+ * The login screen — a real session now, and still not a wall.
  *
- * Sign up and sign in are real: they reach the API, they create and check
- * accounts, and the errors shown here are the ones the server actually
- * returned. What they do not do is protect anything. No session is issued,
- * no token is stored, and every other route works whether or not a visitor
- * has been here — "Continue without an account" only makes that explicit.
+ * PL-7 made signing in mean something: the server sets a session cookie, and
+ * the documents you save are yours. What it deliberately did *not* do is put
+ * this screen in front of the product. Drafting an agreement, talking to the
+ * assistant and downloading the result all still work with no account at all,
+ * and "Continue without an account" is the honest statement of that rather
+ * than a euphemism for a demo mode.
  *
- * That is the shape PL-4 asks for: the account handling a later ticket needs
- * exists and is exercised, while nothing pretends to be protected yet.
+ * What signing in buys is exactly one thing: somewhere for a finished document
+ * to be kept, and a list of the ones you kept.
  */
 export default function LoginPage() {
   const router = useRouter();
+  const { signIn } = useAccount();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,9 +58,8 @@ export default function LoginPage() {
       setSubmitting(true);
 
       try {
-        const response = await fetch(apiUrl(`/api/auth/${mode}`), {
+        const response = await apiFetch(`/api/auth/${mode}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
 
@@ -65,6 +67,12 @@ export default function LoginPage() {
           setError(await describeFailure(response));
           return;
         }
+
+        // Both endpoints answer with the account they just signed in, so the
+        // shell can show an email immediately rather than asking `/me` who we
+        // are a moment after we told it.
+        const account = await response.json().catch(() => null);
+        if (account) signIn(account);
 
         router.push("/");
       } catch {
@@ -75,7 +83,7 @@ export default function LoginPage() {
         setSubmitting(false);
       }
     },
-    [email, mode, password, router],
+    [email, mode, password, router, signIn],
   );
 
   const copy = COPY[mode];
