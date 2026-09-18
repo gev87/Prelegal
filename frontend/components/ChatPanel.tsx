@@ -15,9 +15,17 @@ import {
   ChatUnavailableError,
   sendChatTurn,
   type ChatMessage,
+  type ChatTurn,
   type FieldPath,
 } from "@/lib/chat";
-import { DEFINED_TERMS, type DefinedTermKey, type NdaFields } from "@/lib/nda/schema";
+import { asList, describePaths } from "@/lib/documents/labels";
+import {
+  findDocument,
+  UNDETERMINED,
+  type DocumentFields,
+  type DocumentType,
+} from "@/lib/documents/types";
+import { DEFINED_TERMS, type DefinedTermKey } from "@/lib/nda/schema";
 
 /**
  * What the rest of the app can make the conversation do.
@@ -35,9 +43,13 @@ export interface ChatPanelHandle {
 
 interface ChatPanelProps {
   ref?: Ref<ChatPanelHandle>;
-  fields: NdaFields;
+  /** Every document the assistant can draft, so a switch can be described in
+   *  the new document's own words the moment it happens. */
+  documents: DocumentType[];
+  documentType: string;
+  fields: DocumentFields;
   today: string;
-  onFieldsChange: (fields: NdaFields) => void;
+  onTurn: (turn: ChatTurn) => void;
 }
 
 /**
@@ -47,17 +59,25 @@ interface ChatPanelProps {
  * has asked for anything — and on a server with no key it would turn the
  * first thing a visitor sees into an error, when the document and both
  * downloads work perfectly well without an assistant.
+ *
+ * It names no document, because until somebody says what they want there is
+ * no document to name. Asking the open question is PL-6's whole premise:
+ * eleven agreements are too many for a dropdown to explain and exactly right
+ * for a sentence.
  */
 const GREETING =
-  "I can help you draft a mutual NDA. Tell me what it's for and who the two " +
-  "companies are, and I'll fill in the cover page as we go — you'll see it " +
-  "take shape beside us.";
+  "I can help you draft a legal agreement — an NDA, a cloud service or " +
+  "software licence agreement, a DPA, a pilot, and several more. Tell me " +
+  "what you need and who it's with, and I'll fill it in as we go — you'll " +
+  "see it take shape beside us.";
 
 export default function ChatPanel({
   ref,
+  documents,
+  documentType,
   fields,
   today,
-  onFieldsChange,
+  onTurn,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: GREETING, local: true },
@@ -69,9 +89,9 @@ export default function ChatPanel({
 
   /**
    * Which answers the assistant has actually settled, as opposed to which
-   * fields hold a value. A blank cover page already holds a suggested
-   * purpose, Delaware and one year; told those were answers, the assistant
-   * would never ask the questions they stand in for.
+   * fields hold a value. A blank cover page already holds today's date and
+   * Delaware; told those were answers, the assistant would never ask the
+   * questions they stand in for.
    */
   const confirmed = useRef<FieldPath[]>([]);
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -114,27 +134,43 @@ export default function ChatPanel({
     setError(null);
     setSending(true);
 
+    // Tracked here rather than read from `unavailable` in the `finally`
+    // below, which would still hold the value this render closed over.
+    let switchedOff = false;
+
     try {
       const turn = await sendChatTurn({
         messages: asked,
+        documentType,
         fields,
         confirmedFields: confirmed.current,
         today,
       });
 
-      confirmed.current = [
-        ...new Set([...confirmed.current, ...turn.updatedFields]),
-      ];
-      onFieldsChange(turn.fields);
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", content: turn.reply },
-      ]);
+      const said: ChatMessage[] = [{ role: "assistant", content: turn.reply }];
+
+      if (turn.documentType !== documentType) {
+        // The settled set is replaced rather than extended: answers that did
+        // not carry are outstanding again, and the assistant has to know to
+        // ask for them a second time.
+        confirmed.current = turn.carriedFields;
+
+        const note = describeSwitch(documents, documentType, turn);
+        if (note) said.push({ role: "assistant", content: note, local: true });
+      } else {
+        confirmed.current = [
+          ...new Set([...confirmed.current, ...turn.updatedFields]),
+        ];
+      }
+
+      onTurn(turn);
+      setMessages((current) => [...current, ...said]);
     } catch (failure) {
       if (failure instanceof ChatUnavailableError) {
         // Sticky: a key is either configured for the server or it is not, so
         // letting them try again would just walk them into the same wall.
         setUnavailable(failure.message);
+        switchedOff = true;
       } else {
         setError(
           failure instanceof Error
@@ -144,8 +180,20 @@ export default function ChatPanel({
       }
     } finally {
       setSending(false);
+
+      // Back to the message box, so answering the next question is typing
+      // rather than typing after a click. Sending with the button moves focus
+      // to it, and disabling it while the request is in flight drops focus to
+      // nowhere at all — so without this the conversation stops being a
+      // conversation after the first answer. In `finally` because a turn that
+      // failed is the one you most want to be able to retype immediately.
+      //
+      // Except when the assistant has just switched itself off, because the
+      // box is about to be disabled and focusing a control nobody can type
+      // into only moves the cursor somewhere useless.
+      if (!switchedOff) composer.current?.focus();
     }
-  }, [draft, sending, unavailable, messages, fields, today, onFieldsChange]);
+  }, [draft, sending, unavailable, messages, documents, documentType, fields, today, onTurn]);
 
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -237,8 +285,42 @@ export default function ChatPanel({
   );
 }
 
-/** "a, b and c" — the assistant is talking, not printing a list. */
-function asList(items: string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+/**
+ * What carried across when the document changed, in the app's own voice.
+ *
+ * Said by the app rather than the model for the same reason the blocked
+ * download is: the server computed the answer, so asking the model to
+ * describe it would spend a turn on something already known and risk it
+ * describing the move wrongly. Nothing is said on the very first choice —
+ * there was no document to carry anything from, and announcing that nothing
+ * survived a document nobody was drafting would be nonsense.
+ */
+function describeSwitch(
+  documents: DocumentType[],
+  from: string,
+  turn: ChatTurn,
+): string | null {
+  if (from === UNDETERMINED) return null;
+
+  const previous = findDocument(documents, from);
+  const next = findDocument(documents, turn.documentType);
+  if (!next) return null;
+
+  const name = turn.documentTypeName ?? next.name;
+  const kept = describePaths(next, turn.carriedFields);
+  const lost = previous ? describePaths(previous, turn.droppedFields) : [];
+
+  const sentences = [`Switched to a ${name}.`];
+
+  if (kept.length > 0) sentences.push(`I kept ${asList(kept)}.`);
+  if (lost.length > 0) {
+    sentences.push(
+      `A ${name} doesn't ask for ${asList(lost)}, so I've let ${lost.length === 1 ? "it" : "them"} go.`,
+    );
+  }
+  if (kept.length === 0 && lost.length === 0) {
+    sentences.push("Nothing was settled yet, so we start fresh.");
+  }
+
+  return sentences.join(" ");
 }

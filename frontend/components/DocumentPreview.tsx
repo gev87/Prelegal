@@ -14,13 +14,24 @@ import {
 
 interface DocumentPreviewProps {
   markdown: string;
-  fields: NdaFields;
+  /**
+   * The Mutual NDA's cover page, when that is what is being drafted, and
+   * `null` for the other ten document types.
+   *
+   * Only the NDA has defined terms you can click to edit: the mechanism needs
+   * a hand-written description of what each term *means* as a sentence
+   * ("Expires 1 year from the Effective Date"), which the generic field
+   * descriptors do not carry. Their cross-references still render, as plain
+   * anchors that jump to the cover-page heading — the reference works, it
+   * just is not a control.
+   */
+  ndaFields: NdaFields | null;
   onTermSelect: (key: DefinedTermKey) => void;
 }
 
 export default function DocumentPreview({
   markdown,
-  fields,
+  ndaFields,
   onTermSelect,
 }: DocumentPreviewProps) {
   const components = useMemo<Components>(
@@ -28,19 +39,24 @@ export default function DocumentPreview({
       a({ href, children }) {
         // Cross-references into the cover page are rendered as live defined
         // terms; anything else is an ordinary outbound link.
-        const term = href?.startsWith("#")
-          ? DEFINED_TERM_BY_LABEL[plainText(children)]
-          : undefined;
+        const term =
+          ndaFields && href?.startsWith("#")
+            ? DEFINED_TERM_BY_LABEL[plainText(children)]
+            : undefined;
 
-        if (term) {
+        if (term && ndaFields) {
           return (
             <DefinedTermRef
               term={term}
-              value={describeTerm(term.key, fields)}
+              value={describeTerm(term.key, ndaFields)}
               onSelect={onTermSelect}
             />
           );
         }
+
+        // An in-page cross-reference stays in the page; only real outbound
+        // links get a new tab.
+        if (href?.startsWith("#")) return <a href={href}>{children}</a>;
 
         return (
           <a href={href} target="_blank" rel="noreferrer">
@@ -49,7 +65,7 @@ export default function DocumentPreview({
         );
       },
     }),
-    [fields, onTermSelect],
+    [ndaFields, onTermSelect],
   );
 
   return (

@@ -1,12 +1,12 @@
 """
 The conversation that fills in the cover page.
 
-Stateless, deliberately. The browser keeps the transcript and the current
-cover page and sends both every turn; this endpoint adds a system prompt,
-asks the model, and hands back a reply and an updated cover page. Nothing is
-stored, so there is no session to expire, nothing to clean up, and a restart
-costs a user nothing — which is the same bargain ``app.db`` strikes, for the
-same reason.
+Stateless, deliberately. The browser keeps the transcript, the document type
+and the current cover page and sends all three every turn; this endpoint adds
+a system prompt, asks the model, and hands back a reply and an updated cover
+page. Nothing is stored, so there is no session to expire, nothing to clean
+up, and a restart costs a user nothing — which is the same bargain ``app.db``
+strikes, for the same reason.
 
 The one subtle piece is how a field changes, and it is worth reading before
 changing anything here.
@@ -19,26 +19,43 @@ because the name is not in ``updated_fields``. Asking for a partial answer
 instead would put the same trust in the model's discipline, but with a schema
 full of optional fields, where a null cannot distinguish "unchanged" from
 "cleared". Here every field is required, every constrained field is a real
-enum, and the guarantee is enforced by code on this side of the wire.
+enum, and the guarantee is enforced by code on this side of the wire. It
+lives in ``app.document_schema`` now rather than in this module, because
+there are eleven cover pages rather than one.
+
+PL-6 added a second turn shape to the same endpoint. Until somebody says what
+they want to draft, ``documentType`` is ``undetermined``: the cover page has
+no fields, the prompt's only job is to find out which document they mean, and
+choosing one is handled by exactly the same code that handles changing their
+mind later — a switch from ``undetermined`` is still a switch. One path, one
+set of tests, no bespoke first turn.
 """
 
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field, ValidationError
 
 from app import llm
 from app.chat_prompt import build_system_prompt
-from app.nda_fields import (
-    MAX_TERM_YEARS,
-    MIN_TERM_YEARS,
-    FieldPath,
-    NdaFields,
-    read_leaf,
-    write_leaf,
+from app.document_prompt import build_document_prompt, build_selection_prompt
+from app.document_schema import (
+    apply_updates,
+    chat_turn_model_for,
+    field_paths_for,
+    fields_model_for,
+    is_real_date,
+    switch_document_type,
+)
+from app.document_types import (
+    MUTUAL_NDA,
+    UNDETERMINED,
+    is_known,
+    load_document_types,
+    name_for,
 )
 
 router = APIRouter(tags=["chat"])
@@ -65,33 +82,44 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(max_length=MAX_MESSAGES)
-    fields: NdaFields
+    #: Which document this conversation has settled on, or ``undetermined``
+    #: before it has. A real value rather than ``None`` so the wire format
+    #: never has to tell "not answered" from "cleared" — the same reasoning
+    #: that keeps every field on a cover page required.
+    documentType: str = UNDETERMINED
+    #: The shape depends on ``documentType``, so this cannot be one static
+    #: Pydantic type any more. It is validated against the right model in the
+    #: handler instead, which is what FastAPI would have been doing for us
+    #: while there was only one document.
+    fields: dict[str, Any] = Field(default_factory=dict)
     #: Everything the assistant has settled so far, accumulated by the
     #: browser from previous replies. Without it the model cannot tell an
-    #: answer from a default — see ``chat_prompt._render_confirmed``.
-    confirmedFields: list[FieldPath] = Field(default_factory=list)
+    #: answer from a placeholder — see ``document_prompt.render_confirmed``.
+    confirmedFields: list[str] = Field(default_factory=list)
     #: The visitor's own date, not the server's. The frontend already works
     #: this way for the effective date, and near midnight the two disagree.
     today: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
-class ChatTurn(BaseModel):
-    """What the model is asked to produce. Not what the browser receives —
-    see the module docstring for why the two differ."""
-
-    reply: str
-    fields: NdaFields
-    updated_fields: list[FieldPath]
-
-
 class ChatResponse(BaseModel):
     reply: str
+    #: The type actually in effect after this turn, which is not always the
+    #: one that was sent: this is how the browser learns a document was
+    #: chosen or changed.
+    documentType: str
+    #: What to call it on screen. ``None`` only while undetermined.
+    documentTypeName: str | None
     #: A complete cover page, already merged. The browser assigns it to its
     #: own state as-is and needs no merge logic of its own.
-    fields: NdaFields
+    fields: dict[str, Any]
     #: What actually changed, after the merge dropped anything unlisted.
     #: Feeds the browser's running set of settled answers.
-    updatedFields: list[FieldPath]
+    updatedFields: list[str]
+    #: Set only on a turn that changed the document type. The browser
+    #: *replaces* its settled set with ``carriedFields`` rather than adding
+    #: to it, because the answers that did not carry are outstanding again.
+    carriedFields: list[str] = Field(default_factory=list)
+    droppedFields: list[str] = Field(default_factory=list)
 
 
 @router.post(
@@ -100,66 +128,64 @@ class ChatResponse(BaseModel):
     dependencies=[Depends(llm.ensure_configured)],
 )
 def chat(request: ChatRequest) -> ChatResponse:
-    prompt = build_system_prompt(
-        request.fields, set(request.confirmedFields), _usable_date(request.today)
-    )
-    messages = [{"role": "system", "content": prompt}]
+    active = request.documentType if is_known(request.documentType) else UNDETERMINED
+    today = _usable_date(request.today)
+
+    try:
+        current = fields_model_for(active).model_validate(request.fields)
+    except ValidationError as error:
+        raise HTTPException(
+            status_code=422, detail=f"fields do not match documentType {active!r}."
+        ) from error
+
+    known_paths = set(field_paths_for(active))
+    confirmed = {path for path in request.confirmedFields if path in known_paths}
+
+    messages = [{"role": "system", "content": _prompt(active, current, confirmed, today)}]
     messages += [message.model_dump() for message in request.messages]
 
-    turn = llm.complete_structured(messages, ChatTurn)
-    merged, applied = apply_updates(request.fields, turn.fields, turn.updated_fields)
+    turn = llm.complete_structured(messages, chat_turn_model_for(active))
+    chosen = str(turn.documentType)
 
-    return ChatResponse(reply=turn.reply, fields=merged, updatedFields=applied)
+    if chosen != active and is_known(chosen):
+        moved, carried, dropped = switch_document_type(
+            active, current, confirmed, chosen, today
+        )
+        return ChatResponse(
+            reply=turn.reply,
+            documentType=chosen,
+            documentTypeName=name_for(chosen),
+            fields=moved.model_dump(mode="json"),
+            # Nothing was *answered* this turn. What survived the move is
+            # reported separately, because the browser has to replace its
+            # settled set rather than extend it.
+            updatedFields=[],
+            carriedFields=carried,
+            droppedFields=dropped,
+        )
+
+    merged, applied = apply_updates(active, current, turn.fields, turn.updated_fields)
+
+    return ChatResponse(
+        reply=turn.reply,
+        documentType=active,
+        documentTypeName=name_for(active),
+        fields=merged.model_dump(mode="json"),
+        updatedFields=applied,
+    )
 
 
-def apply_updates(
-    current: NdaFields, proposed: NdaFields, updated: list[FieldPath]
-) -> tuple[NdaFields, list[FieldPath]]:
-    """Copies the listed paths from ``proposed`` onto ``current``.
+def _prompt(slug: str, fields: BaseModel, confirmed: set[str], today: str) -> str:
+    """The system message for this turn, by document type.
 
-    Everything else in ``proposed`` is discarded, however plausible it looks.
-    A value that survives the enum and range constraints but is still not a
-    real answer — the 30th of February — is dropped on its own, so one bad
-    field costs that field rather than the whole turn.
-
-    Returns the merged cover page and the paths that actually took, which are
-    the listed paths minus anything dropped.
+    Three cases and no more: nothing chosen yet, the hand-written Mutual NDA,
+    and any of the ten types described by descriptors.
     """
-    merged = current.model_copy(deep=True)
-    applied: list[FieldPath] = []
-
-    for path in updated:
-        value = read_leaf(proposed, path)
-        if not _is_usable(path, value):
-            continue
-        write_leaf(merged, path, value)
-        applied.append(path)
-
-    return merged, applied
-
-
-def _is_usable(path: FieldPath, value: object) -> bool:
-    """The checks the schema cannot make.
-
-    Pydantic has already guaranteed the type, the enum membership and the
-    year range by the time anything gets here. What it cannot guarantee is
-    that a string matching the date pattern names a day that exists.
-    """
-    if path is FieldPath.EFFECTIVE_DATE:
-        return isinstance(value, str) and _is_real_date(value)
-
-    if path in (FieldPath.MNDA_TERM_YEARS, FieldPath.CONFIDENTIALITY_YEARS):
-        return isinstance(value, int) and MIN_TERM_YEARS <= value <= MAX_TERM_YEARS
-
-    return True
-
-
-def _is_real_date(value: str) -> bool:
-    try:
-        date.fromisoformat(value)
-    except ValueError:
-        return False
-    return True
+    if slug == UNDETERMINED:
+        return build_selection_prompt(today)
+    if slug == MUTUAL_NDA:
+        return build_system_prompt(fields, confirmed, today)
+    return build_document_prompt(load_document_types()[slug], fields, confirmed, today)
 
 
 def _usable_date(value: str) -> str:
@@ -169,4 +195,4 @@ def _usable_date(value: str) -> str:
     trust boundary — a wrong date makes for a wrong suggestion, not an
     exploit — so a nonsense value falls back rather than failing the turn.
     """
-    return value if _is_real_date(value) else date.today().isoformat()
+    return value if is_real_date(value) else date.today().isoformat()

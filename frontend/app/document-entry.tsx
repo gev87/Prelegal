@@ -2,13 +2,14 @@
 
 import { useSyncExternalStore } from "react";
 
-import NdaCreator from "@/components/NdaCreator";
+import DocumentCreator from "@/components/DocumentCreator";
+import type { DocumentType } from "@/lib/documents/types";
 import { isoToday } from "@/lib/date";
 
-interface NdaEntryProps {
-  /** The Standard Terms, read from the repository's templates/ directory at
-   *  build time — see lib/nda/templates.ts. */
-  standardTerms: string;
+interface DocumentEntryProps {
+  /** Every document type, with its Standard Terms and field descriptors, read
+   *  at build time — see lib/documents/catalog.ts. */
+  documents: DocumentType[];
 }
 
 /** The clock is read, never watched: no subscriber is ever notified. */
@@ -31,19 +32,19 @@ const noDateYet = () => null;
  * for a value that was available on the first.
  *
  * The creator is not rendered until the date is known, rather than rendered
- * with a placeholder and corrected afterwards. `NdaCreator` seeds its form
- * state from `today` in a `useState` initialiser, which reads the prop once
- * and ignores every later value — a correction would leave the cover page
- * showing the placeholder.
+ * with a placeholder and corrected afterwards. `DocumentCreator` passes
+ * `today` to every turn, and the backend uses it to suggest dates — a
+ * placeholder corrected a moment later would mean the first suggestion of
+ * every conversation was the build date.
  */
-export default function NdaEntry({ standardTerms }: NdaEntryProps) {
+export default function DocumentEntry({ documents }: DocumentEntryProps) {
   const today = useSyncExternalStore(neverChanges, isoTodayString, noDateYet);
 
   if (today === null) {
     return <div className="app-loading" aria-busy="true" />;
   }
 
-  return <NdaCreator standardTerms={standardTerms} today={today} />;
+  return <DocumentCreator documents={documents} today={today} />;
 }
 
 /**

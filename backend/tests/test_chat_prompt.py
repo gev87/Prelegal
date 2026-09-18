@@ -105,8 +105,29 @@ def test_it_says_not_to_guess() -> None:
 
 
 def test_it_names_the_document_it_can_draft() -> None:
-    """PL-5 keeps the product to one document. The assistant has to be able
-    to say so rather than pretending to draft something else."""
+    """The assistant has to be able to say what it is drafting rather than
+    pretending to draft something else. PL-5 needed this because there was
+    one document; PL-6 needs it because there are eleven."""
     prompt = a_prompt()
 
     assert "Mutual NDA" in prompt
+
+
+def test_it_must_end_with_a_question_while_anything_is_outstanding() -> None:
+    """The PL-6 fix, pinned on the Mutual NDA's prompt as well as the generic
+    one. The rule is imported from ``document_prompt`` precisely so it cannot
+    hold for ten document types and quietly miss the eleventh — this is the
+    test that would catch someone unpicking that."""
+    prompt = a_prompt(confirmed=set())
+
+    assert "# Ending your turn" in prompt
+    assert "question about one of those things" in prompt
+
+
+def test_it_offers_the_other_documents_when_this_is_the_wrong_one() -> None:
+    """PL-6: somebody who wanted a DPA should be told Prelegal can draft one,
+    not just that this is an NDA."""
+    prompt = a_prompt()
+
+    assert "Data Processing Agreement" in prompt
+    assert "Pilot Agreement" in prompt
